@@ -1,8 +1,7 @@
-import { PGlite } from "@electric-sql/pglite";
-import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
+import EmbeddedPostgres from "embedded-postgres";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir, mkdtemp } from "node:fs/promises";
 import { createServer } from "node:net";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -24,16 +23,31 @@ async function port() {
   return result;
 }
 async function main() {
-  const pg = new PGlite();
   const pgPort = await port();
   const httpPort = await port();
   const base = `http://127.0.0.1:${httpPort}`;
-  const socket = new PGLiteSocketServer({
-    db: pg,
+  await mkdir("work", { recursive: true });
+  const databasePassword = randomBytes(24).toString("hex");
+  const embedded = new EmbeddedPostgres({
+    databaseDir: await mkdtemp(resolve("work/payments-db-")),
+    user: "postgres",
+    password: databasePassword,
     port: pgPort,
-    host: "127.0.0.1",
-    maxConnections: 4,
+    persistent: false,
+    authMethod: "scram-sha-256",
+    createPostgresUser: false,
+    postgresFlags: [
+      "-h",
+      "127.0.0.1",
+      "-c",
+      "unix_socket_directories=",
+      "-c",
+      "log_min_error_statement=panic",
+    ],
+    onLog: () => {},
+    onError: () => {},
   });
+  const pg = embedded.getPgClient("postgres", "127.0.0.1");
   let child: ReturnType<typeof spawn> | undefined;
   let logs = "";
   let checks = 0;
@@ -45,6 +59,9 @@ async function main() {
   const salt = randomBytes(24).toString("hex");
   const password = randomBytes(18).toString("hex");
   try {
+    await embedded.initialise();
+    await embedded.start();
+    await pg.connect();
     for (const file of [
       "001-admin.sql",
       "002-admin-security.sql",
@@ -52,8 +69,8 @@ async function main() {
       "004-customer-accounts.sql",
       "005-commerce.sql",
     ])
-      await pg.exec(await readFile(`db/${file}`, "utf8"));
-    await pg.exec(await readFile("db/003-paytr.sql", "utf8"));
+      await pg.query(await readFile(`db/${file}`, "utf8"));
+    await pg.query(await readFile("db/003-paytr.sql", "utf8"));
     check(true, "Payment migration is rerunnable");
     for (const category of initialCategories)
       await pg.query("INSERT INTO woya_categories(id,data) VALUES($1,$2)", [
@@ -87,10 +104,9 @@ async function main() {
       "INSERT INTO woya_admin_credentials(identity,password_hash) VALUES('woya-admin',$1)",
       [await bcrypt.hash(password, 12)],
     );
-    await pg.exec(
+    await pg.query(
       'UPDATE woya_store_settings SET data=\'{"shippingFee":10000,"freeShippingThreshold":200000,"totalDeliveryDays":7,"replyTo":"support@example.test","notificationEmail":"merchant@example.test"}\'::jsonb',
     );
-    await socket.start();
     child = spawn(
       process.execPath,
       [
@@ -105,7 +121,7 @@ async function main() {
         env: {
           ...process.env,
           NODE_OPTIONS: `--import=${pathToFileURL(resolve("tests/fixtures/paytr-provider.mjs")).href}`,
-          DATABASE_URL: `postgres://postgres:postgres@127.0.0.1:${pgPort}/postgres`,
+          DATABASE_URL: `postgres://postgres:${databasePassword}@127.0.0.1:${pgPort}/postgres`,
           APP_URL: base,
           ADMIN_SESSION_SECRET: randomBytes(32).toString("hex"),
           STORAGE_DRIVER: "local",
@@ -212,7 +228,7 @@ async function main() {
     }
     async function begin(email = customer.email) {
       cookie = "";
-      await pg.exec("DELETE FROM woya_rate_limits");
+      await pg.query("DELETE FROM woya_rate_limits");
       const q = await quote();
       const input = {
         requestId: randomUUID(),
@@ -659,9 +675,8 @@ async function main() {
       child.kill("SIGTERM");
       await once(child, "exit");
     }
-    await socket.stop();
-    await new Promise((done) => setTimeout(done, 100));
-    await pg.close();
+    await pg.end();
+    await embedded.stop();
   }
 }
 main().catch((e) => {

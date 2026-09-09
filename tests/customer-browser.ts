@@ -152,8 +152,20 @@ export async function verifyBrowser({
         "profil/siparisler/" + orderReference,
         "odeme",
       ]) {
-        await page.goto(base + "/" + route);
+        // The layout audit waits for the application, not the load event of embedded resources.
+        await page.goto(base + "/" + route, { waitUntil: "domcontentloaded" });
         await expect(page.getByRole("main")).toBeVisible();
+        if (route === "odeme") {
+          await expect(
+            page.getByRole("heading", {
+              name: "Siparişinizi tamamlayın",
+              exact: true,
+            }),
+          ).toBeVisible();
+          await expect(
+            page.getByLabel("Ad soyad", { exact: true }),
+          ).toBeVisible();
+        }
         await expect
           .poll(() =>
             page.evaluate(
@@ -272,7 +284,9 @@ export async function verifyBrowser({
       .getByRole("button", { name: "Siparişi görüntüle", exact: true })
       .click();
     await guestPage.waitForURL("**/profil/siparisler/*", { timeout: 30000 });
-    await expect(guestPage.getByText(guestRef, { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(
+      guestPage.getByText(guestRef, { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
     await guestPage.screenshot({
       path: "work/customer-qa/mobile-guest-order.png",
       fullPage: true,
