@@ -1,3 +1,4 @@
+import { isPaytrIframeToken } from "../lib/payments/protocol";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
@@ -115,4 +116,23 @@ test("Receipt removes only purchased quantities and preserves other configuratio
     [{ ...item, quantity: 1 }, other, { ...item, slug: "other", quantity: 1 }],
   );
   assert.deepEqual(subtractPurchase([item], [item]), []);
+});
+
+test("PayTR URL-safe iframe tokens accept hyphens and reject unsafe path segments", () => {
+  assert.equal(isPaytrIframeToken("test-" + "a".repeat(69)), true);
+  assert.equal(isPaytrIframeToken("test_" + "b".repeat(69)), true);
+  assert.equal(isPaytrIframeToken("a".repeat(64)), true);
+  for (const value of [
+    null,
+    42,
+    "short",
+    "a".repeat(257),
+    "../" + "a".repeat(64),
+    "https://evil.test/" + "a".repeat(64),
+    "a".repeat(20) + "?x=1",
+    "a".repeat(20) + "#fragment",
+    "a".repeat(20) + "\n",
+  ]) {
+    assert.equal(isPaytrIframeToken(value), false);
+  }
 });

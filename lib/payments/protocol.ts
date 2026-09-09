@@ -1,6 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type Merchant = { id: string; key: string; salt: string };
+// PayTR issues opaque URL-safe tokens, including hyphens. Keep them to one bounded path segment.
+export function isPaytrIframeToken(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{16,256}$/.test(value);
+}
 export function tokenSignature(
   fields: Record<string, string>,
   merchant: Merchant,

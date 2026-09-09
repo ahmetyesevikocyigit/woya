@@ -55,6 +55,8 @@ globalThis.fetch = async (input, init) => {
   await new Promise((resolve) => setTimeout(resolve, 100));
   return Response.json({
     status: "success",
-    token: createHash("sha256").update(form.get("merchant_oid")).digest("hex"),
+    token:
+      "test-" +
+      createHash("sha256").update(form.get("merchant_oid")).digest("hex"),
   });
 };

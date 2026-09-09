@@ -1,4 +1,5 @@
 import "server-only";
+import { isPaytrIframeToken } from "./protocol";
 import { customerSession, lockCustomer } from "../customer/auth";
 import { subtractPurchase } from "./cart";
 import type { AccountCartItem } from "../customer/schema";
@@ -140,8 +141,7 @@ export async function startPayment(input: CheckoutInput, request: Request) {
     if (
       response.ok &&
       body.status === "success" &&
-      typeof body.token === "string" &&
-      /^[A-Za-z0-9]{16,256}$/.test(body.token)
+      isPaytrIframeToken(body.token)
     ) {
       token = body.token;
       state = "ready";
