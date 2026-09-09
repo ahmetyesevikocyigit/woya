@@ -36,7 +36,8 @@ function copyDirectory(source, target) {
     );
   }
   cpSync(source, target, {
-    dereference: true,
+    dereference: false,
+    verbatimSymlinks: true,
     errorOnExist: false,
     force: true,
     recursive: true,
@@ -152,10 +153,21 @@ async function main() {
     );
   }
 
-  execFileSync("tar", ["-czf", archivePath, "-C", stageDir, "."], {
-    cwd: root,
-    stdio: "inherit",
-  });
+  // Preserve package-relative links so pnpm dependency resolution stays intact.
+  // CI and the VPS validate every link stays inside this exact archive.
+  execFileSync(
+    "python3",
+    [
+      "-c",
+      "import sys,tarfile; t=tarfile.open(sys.argv[2],'w:gz',dereference=False); t.add(sys.argv[1],arcname='.'); t.close()",
+      stageDir,
+      archivePath,
+    ],
+    {
+      cwd: root,
+      stdio: "inherit",
+    },
+  );
 
   const bytes = await readFile(archivePath);
   const sha256 = createHash("sha256").update(bytes).digest("hex");

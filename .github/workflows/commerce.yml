@@ -42,6 +42,11 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:customer:browser
       - run: node scripts/package-vps.mjs
+      - name: Validate and boot the exact deployment archive
+        run: |
+          mkdir -p /tmp/woya-release-check
+          python3 ops/vps/extract-release.py dist/woya-vps-standalone.tar.gz /tmp/woya-release-check
+          node tests/packaged-runtime.mjs /tmp/woya-release-check
       - uses: actions/upload-artifact@v4
         with:
           name: woya-${{ github.sha }}
