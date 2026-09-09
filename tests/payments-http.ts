@@ -88,7 +88,7 @@ async function main() {
       [await bcrypt.hash(password, 12)],
     );
     await pg.exec(
-      'UPDATE woya_store_settings SET data=\'{"shippingFee":10000,"freeShippingThreshold":200000,"productionDays":3,"deliveryDays":2,"replyTo":"support@example.test","notificationEmail":"merchant@example.test"}\'::jsonb',
+      'UPDATE woya_store_settings SET data=\'{"shippingFee":10000,"freeShippingThreshold":200000,"totalDeliveryDays":7,"replyTo":"support@example.test","notificationEmail":"merchant@example.test"}\'::jsonb',
     );
     await socket.start();
     child = spawn(

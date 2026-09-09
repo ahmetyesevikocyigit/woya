@@ -10,6 +10,8 @@ import {
   storeSettingsSchema,
   configuredShipping,
   missingStoreSettings,
+  deliveryBusinessDays,
+  deliveryAnnouncement,
 } from "../lib/commerce/schema";
 import { checkoutBillingSchema } from "../lib/customer/schema";
 test("Shipping and corporate billing fail closed without fabricated values", () => {
@@ -38,6 +40,27 @@ test("Shipping and corporate billing fail closed without fabricated values", () 
       name: "Test Buyer",
       address: "Test Street No 123 Istanbul",
     }).success,
+    false,
+  );
+});
+test("Total delivery promise overrides legacy durations without inventing missing settings", () => {
+  const empty = storeSettingsSchema.parse({});
+  assert.equal(deliveryBusinessDays(empty), null);
+  const legacy = { ...empty, productionDays: 3, deliveryDays: 2 };
+  assert.equal(deliveryBusinessDays(legacy), 5);
+  const current = { ...empty, totalDeliveryDays: 7 };
+  assert.equal(deliveryAnnouncement(current), "7 iş gününde teslimat");
+  assert.equal(deliveryBusinessDays({ ...legacy, totalDeliveryDays: 7 }), 7);
+  assert.ok(!missingStoreSettings(current).includes("productionDays"));
+  assert.ok(!missingStoreSettings(current).includes("deliveryDays"));
+  assert.ok(missingStoreSettings(current).includes("shippingFee"));
+  assert.ok(!missingStoreSettings(legacy).includes("totalDeliveryDays"));
+  assert.equal(
+    storeSettingsSchema.safeParse({ totalDeliveryDays: 0 }).success,
+    false,
+  );
+  assert.equal(
+    storeSettingsSchema.safeParse({ totalDeliveryDays: 7.5 }).success,
     false,
   );
 });

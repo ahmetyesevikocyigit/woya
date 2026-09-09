@@ -9,6 +9,7 @@ import type { CheckoutQuote } from "@/lib/payments/schema";
 import type { AccountData } from "@/lib/customer/types";
 import { checkoutBillingSchema } from "@/lib/customer/schema";
 import { customerSchema } from "@/lib/payments/schema";
+import { deliveryAnnouncement } from "@/lib/commerce/schema";
 import styles from "./payment.module.css";
 
 export const money = (kurus: number) =>
@@ -371,10 +372,7 @@ export function CheckoutForm({
                   {summary.quote.store.sellerName} ·{" "}
                   {summary.quote.store.sellerAddress}
                 </p>
-                <p>
-                  Üretim: {summary.quote.store.productionDays} iş günü. Kargo:{" "}
-                  {summary.quote.store.deliveryDays} iş günü.
-                </p>
+                <p>{deliveryAnnouncement(summary.quote.store)}</p>
                 {[
                   summary.quote.store.informationText,
                   summary.quote.store.termsText,

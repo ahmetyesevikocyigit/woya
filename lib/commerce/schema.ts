@@ -6,6 +6,13 @@ export const storeSettingsSchema = z
   .object({
     shippingFee: money.default(null),
     freeShippingThreshold: money.default(null),
+    totalDeliveryDays: z
+      .number()
+      .int()
+      .min(1)
+      .max(455)
+      .nullable()
+      .default(null),
     productionDays: z.number().int().min(0).max(365).nullable().default(null),
     deliveryDays: z.number().int().min(1).max(90).nullable().default(null),
     replyTo: email.default(""),
@@ -29,9 +36,34 @@ export const emptyStoreSettings = storeSettingsSchema.parse({});
 export function missingStoreSettings(s: StoreSettings) {
   return Object.entries(s)
     .filter(
-      ([key, v]) => key !== "freeShippingThreshold" && (v === null || v === ""),
+      ([key, v]) =>
+        ![
+          "freeShippingThreshold",
+          "productionDays",
+          "deliveryDays",
+          "totalDeliveryDays",
+        ].includes(key) &&
+        (v === null || v === ""),
     )
-    .map(([k]) => k);
+    .map(([k]) => k)
+    .concat(deliveryBusinessDays(s) === null ? ["totalDeliveryDays"] : []);
+}
+// Old settings and immutable order snapshots retain their separate durations.
+export function deliveryBusinessDays(s: {
+  totalDeliveryDays?: number | null;
+  productionDays: number | null;
+  deliveryDays: number | null;
+}) {
+  if (s.totalDeliveryDays != null) return s.totalDeliveryDays;
+  return s.productionDays !== null && s.deliveryDays !== null
+    ? s.productionDays + s.deliveryDays
+    : null;
+}
+export function deliveryAnnouncement(
+  s: Parameters<typeof deliveryBusinessDays>[0],
+) {
+  const days = deliveryBusinessDays(s);
+  return days === null ? "Özenle hazırlanır" : `${days} iş gününde teslimat`;
 }
 export function configuredShipping(subtotal: number, s: StoreSettings) {
   if (s.shippingFee === null) return null;

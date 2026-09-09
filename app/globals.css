@@ -3522,13 +3522,16 @@ img {
 @media (max-width: 680px) {
   .top-announcement {
     font-size: 0.72rem;
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px 14px;
     min-height: 36px;
-    padding: 0 10px;
+    padding: 6px 10px;
     text-align: center;
   }
 
-  .top-announcement span {
+  .top-announcement span:last-child {
     display: none;
   }
 

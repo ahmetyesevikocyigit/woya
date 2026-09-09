@@ -215,6 +215,14 @@ async function main() {
       ).status === 401,
       "Wrong password denied",
     );
+    check(
+      (await api("/api/admin/commerce", undefined, "GET")).status === 401,
+      "Anonymous CMS settings read denied",
+    );
+    check(
+      (await api("/api/admin/commerce?action=settings", {})).status === 401,
+      "Anonymous CMS settings write denied",
+    );
     const login = await api("/api/admin/auth", {
       password,
     });
@@ -224,6 +232,66 @@ async function main() {
       login.headers.get("set-cookie")!.includes("HttpOnly"),
       "HttpOnly session issued",
     );
+    const settingsBefore = await (
+      await api("/api/admin/commerce", undefined, "GET")
+    ).json();
+    const settingsInput = {
+      version: settingsBefore.settings.version,
+      data: {
+        ...settingsBefore.settings.data,
+        freeShippingThreshold: 200000,
+        totalDeliveryDays: 7,
+      },
+    };
+    check(
+      (
+        await api(
+          "/api/admin/commerce?action=settings",
+          settingsInput,
+          "POST",
+          "https://evil.test",
+        )
+      ).status === 403,
+      "CMS settings reject cross-origin writes",
+    );
+    check(
+      (
+        await api("/api/admin/commerce?action=settings", {
+          ...settingsInput,
+          data: { ...settingsInput.data, totalDeliveryDays: -1 },
+        })
+      ).status === 400,
+      "CMS settings validate delivery duration on server",
+    );
+    check(
+      (await api("/api/admin/commerce?action=settings", settingsInput))
+        .status === 200,
+      "Partial CMS settings save without invented seller or shipping fee",
+    );
+    check(
+      (await api("/api/admin/commerce?action=settings", settingsInput))
+        .status === 409,
+      "CMS settings reject stale writes",
+    );
+    const settingsAfter = await (
+      await api("/api/admin/commerce", undefined, "GET")
+    ).json();
+    check(
+      settingsAfter.settings.data.shippingFee === null &&
+        settingsAfter.settings.data.sellerName === "" &&
+        settingsAfter.settings.data.totalDeliveryDays === 7,
+      "CMS partial save preserves unconfigured fields",
+    );
+    const announcement = await (await fetch(base)).text();
+    check(
+      announcement.includes("7 iş gününde teslimat") &&
+        announcement.includes("2.000 TL ve üzeri ücretsiz kargo"),
+      "Storefront reads the saved delivery promise and threshold",
+    );
+    if (process.env.WOYA_ADMIN_BROWSER_TESTS === "1") {
+      const { verifyAdminCms } = await import("./admin-cms-browser");
+      await verifyAdminCms({ base, cookie });
+    }
     for (const route of [
       "/admin",
       "/admin/urunler",
@@ -234,6 +302,8 @@ async function main() {
       "/admin/medya",
       "/admin/guvenlik",
       "/admin/fiyatlandirma",
+      "/admin/magaza",
+      "/admin/bildirimler",
     ]) {
       const r = await fetch(base + route, { headers: { Cookie: cookie } });
       check(r.status === 200, `${route} renders authenticated`);

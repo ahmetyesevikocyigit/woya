@@ -78,3 +78,10 @@ curl --fail http://127.0.0.1:3180/
 ```
 
 This rolls back code, not database edits or uploaded images. After fixing/reverting `main`, remove `/etc/woya/deploy-paused` and restart the deployment timer.
+
+
+### CMS settings
+
+`/admin` links to product/pricing, site content, media, store settings, orders and notifications. `/admin/magaza` saves partial configuration with version conflict protection. Shipping amounts are stored in kuruş. `totalDeliveryDays` is the complete production-plus-carrier promise; old settings without it continue using `productionDays + deliveryDays`. The homepage announcement and checkout use this same setting. Unconfigured shipping fees continue blocking checkout.
+
+The CMS release adds an optional JSON settings field, without changing tables or historical orders. Before setting it in production, keep a protected copy of the existing store settings. If manually rolling back to a release predating this field, remove only `totalDeliveryDays` from the current store-settings JSON (the old parser rejects unknown keys), preserving other operator edits; restore the captured legacy durations if needed. Do not rewrite order snapshots. The previous release used the existing legacy duration fields.

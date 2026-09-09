@@ -3,6 +3,7 @@ import { db, databaseConfigured } from "../admin/db";
 import { HttpError } from "../http-error";
 import {
   emptyStoreSettings,
+  deliveryBusinessDays,
   storeSettingsSchema,
   missingStoreSettings,
 } from "./schema";
@@ -17,11 +18,7 @@ export async function storeSettings() {
 }
 export async function checkoutSettings() {
   const { data } = await storeSettings();
-  if (
-    data.shippingFee === null ||
-    data.productionDays === null ||
-    data.deliveryDays === null
-  )
+  if (data.shippingFee === null || deliveryBusinessDays(data) === null)
     throw new HttpError(503, "Teslimat koşulları henüz tanımlanmadı.");
   if (
     process.env.PAYTR_TEST_MODE === "0" &&

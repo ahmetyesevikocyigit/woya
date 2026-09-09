@@ -38,8 +38,8 @@ jobs:
           pnpm test:commerce
           pnpm test:smtp
       - run: pnpm build --webpack
-      - run: pnpm test:admin:http && pnpm test:payments:http
       - run: pnpm exec playwright install --with-deps chromium
+      - run: WOYA_ADMIN_BROWSER_TESTS=1 pnpm test:admin:http && pnpm test:payments:http
       - run: pnpm test:customer:browser
       - run: node scripts/package-vps.mjs
       - name: Validate and boot the exact deployment archive

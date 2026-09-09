@@ -10,6 +10,10 @@ import {
   Plus,
   Ruler,
   FileText,
+  Settings,
+  Image,
+  Layers,
+  Bell,
 } from "lucide-react";
 import { protectPage } from "@/lib/admin/auth";
 import {
@@ -39,6 +43,7 @@ export default async function AdminPage({
   params: Promise<{ path?: string[] }>;
   searchParams: Promise<{
     kaydedildi?: string;
+    bolum?: string;
     q?: string;
     status?: string;
     page?: string;
@@ -49,7 +54,7 @@ export default async function AdminPage({
   const [section = "", id] = path;
   const query = await searchParams;
   const saved = query.kaydedildi;
-  let title = "Genel Bakış";
+  let title = "CMS Ana Sayfa";
   let content: React.ReactNode;
   if (path.length > 2) notFound();
   if (section === "urunler") {
@@ -152,8 +157,11 @@ export default async function AdminPage({
     title = "Görsel Kütüphanesi";
     content = <MediaLibrary />;
   } else if (section === "magaza" && !id) {
-    title = "Mağaza ve Bildirimler";
-    content = <CommercePanel />;
+    title = "Mağaza Ayarları";
+    content = <CommercePanel initialSection={query.bolum} />;
+  } else if (section === "bildirimler" && !id) {
+    title = "Bildirimler ve Kontroller";
+    content = <CommercePanel notifications />;
   } else if (section === "guvenlik" && !id) {
     title = "Güvenlik";
     content = <SecurityPanel summary={await securitySummary()} />;
@@ -181,8 +189,16 @@ export default async function AdminPage({
             </article>
           ))}
         </div>
-        <nav className="admin-quick-links" aria-label="Hızlı işlemler">
+        <nav
+          className="admin-quick-links admin-cms-links"
+          aria-label="Hızlı işlemler"
+        >
           {[
+            {
+              href: "/admin/urunler",
+              label: "Ürünler ve fiyatlar",
+              icon: Package,
+            },
             { href: "/admin/urunler/yeni", label: "Ürün ekle", icon: Plus },
             {
               href: "/admin/fiyatlandirma",
@@ -191,8 +207,35 @@ export default async function AdminPage({
             },
             {
               href: "/admin/icerik",
-              label: "Site içeriğini düzenle",
+              label: "Ana sayfa, iletişim ve site içeriği",
               icon: FileText,
+            },
+            { href: "/admin/medya", label: "Görsel kütüphanesi", icon: Image },
+            { href: "/admin/kategoriler", label: "Kategoriler", icon: Layers },
+            {
+              href: "/admin/magaza?bolum=kargo",
+              label: "Kargo ve teslimat",
+              icon: Settings,
+            },
+            {
+              href: "/admin/magaza?bolum=iade",
+              label: "İade adresi",
+              icon: Settings,
+            },
+            {
+              href: "/admin/magaza?bolum=firma",
+              label: "Firma bilgileri",
+              icon: FileText,
+            },
+            {
+              href: "/admin/magaza?bolum=yasal",
+              label: "Satış ve gizlilik metinleri",
+              icon: FileText,
+            },
+            {
+              href: "/admin/bildirimler",
+              label: "E-posta ve ödeme kontrolleri",
+              icon: Bell,
             },
             {
               href: "/admin/siparisler",

@@ -5,6 +5,7 @@ import {
   storeSettingsSchema,
   emptyStoreSettings,
   missingStoreSettings,
+  deliveryAnnouncement,
   type StoreSettings,
 } from "@/lib/commerce/schema";
 const emailStates: Record<string, string> = {
@@ -19,6 +20,7 @@ const emailStates: Record<string, string> = {
   complained: "Spam bildirimi",
 };
 const labels: Record<keyof StoreSettings, string> = {
+  totalDeliveryDays: "Toplam teslim süresi (iş günü)",
   shippingFee: "Kargo bedeli (TL)",
   freeShippingThreshold: "Ücretsiz kargo eşiği (TL; yoksa boş bırakın)",
   productionDays: "Üretim süresi (iş günü)",
@@ -54,122 +56,312 @@ async function api(url: string, init?: RequestInit) {
   if (!r.ok) throw new Error(body.error || "İşlem tamamlanamadı.");
   return body;
 }
-export function CommercePanel() {
+const sections = [
+  {
+    id: "kargo",
+    title: "Kargo ve teslimat",
+    keys: ["shippingFee", "freeShippingThreshold", "totalDeliveryDays"],
+  },
+  { id: "iade", title: "İade", keys: ["returnAddress"] },
+  {
+    id: "firma",
+    title: "Firma bilgileri",
+    keys: [
+      "sellerName",
+      "sellerTaxOffice",
+      "sellerTaxNumber",
+      "sellerAddress",
+      "sellerPhone",
+    ],
+  },
+  {
+    id: "yasal",
+    title: "Sözleşmeler",
+    keys: ["legalVersion", "termsText", "informationText", "privacyText"],
+  },
+  {
+    id: "eposta",
+    title: "E-posta adresleri",
+    keys: ["replyTo", "notificationEmail"],
+  },
+] as const;
+export function CommercePanel({
+  initialSection = "kargo",
+  notifications = false,
+}: {
+  initialSection?: string;
+  notifications?: boolean;
+}) {
   const [data, setData] = useState<Summary>();
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [section, setSection] = useState(
+    sections.some((s) => s.id === initialSection) ? initialSection : "kargo",
+  );
+  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  async function load() {
-    try {
-      setData(await api("/api/admin/commerce"));
-    } catch (e) {
-      setError((e as Error).message);
-    }
+  function install(summary: Summary) {
+    setData(summary);
+    setDraft(
+      Object.fromEntries(
+        Object.entries(summary.settings.data).map(([k, v]) => [
+          k,
+          v === null
+            ? ""
+            : ["shippingFee", "freeShippingThreshold"].includes(k)
+              ? String(Number(v) / 100)
+              : String(v),
+        ]),
+      ),
+    );
+    setDirty(false);
   }
   useEffect(() => {
-    void load();
+    let active = true;
+    api("/api/admin/commerce")
+      .then((result) => {
+        if (active) install(result);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
-  if (!data) return <p role="status">{error || "Yükleniyor…"}</p>;
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+  if (!data)
+    return <p role={error ? "alert" : "status"}>{error || "Yükleniyor…"}</p>;
+  if (notifications) return <CommerceNotifications data={data} />;
+  const active = sections.find((s) => s.id === section)!;
+  const missing = missingStoreSettings(data.settings.data);
   return (
     <>
-      <p className="admin-notice">
-        Eksik alanlar:{" "}
-        {missingStoreSettings(data.settings.data)
-          .map((k) => labels[k as keyof StoreSettings])
-          .join(", ") || "Yok"}
-        . Canlı tahsilat, sağlayıcı testleri doğrulandıktan sonra sunucudan
-        açılır.
-      </p>
-      <form
-        className="admin-form"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (busy) return;
-          setBusy(true);
-          setError("");
-          setMessage("");
-          const f = new FormData(e.currentTarget);
-          const values: Record<string, unknown> = {};
-          for (const key of Object.keys(emptyStoreSettings)) {
-            const raw = String(f.get(key) || "");
-            values[key] = [
-              "shippingFee",
-              "freeShippingThreshold",
-              "productionDays",
-              "deliveryDays",
-            ].includes(key)
-              ? raw === ""
-                ? null
-                : Math.round(
-                    Number(raw) *
-                      (["shippingFee", "freeShippingThreshold"].includes(key)
-                        ? 100
-                        : 1),
-                  )
-              : raw;
-          }
-          try {
-            const settings = storeSettingsSchema.parse(values);
-            await api("/api/admin/commerce?action=settings", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                data: settings,
-                version: data.settings.version,
+      <nav className="admin-settings-tabs" aria-label="Mağaza ayarları">
+        {sections.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            aria-pressed={section === s.id}
+            onClick={() => {
+              setSection(s.id);
+              setMessage("");
+            }}
+          >
+            {s.title}
+          </button>
+        ))}
+      </nav>
+      <div className="admin-settings-layout">
+        <form
+          className="admin-form admin-settings-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (busy) return;
+            setBusy(true);
+            setError("");
+            setMessage("");
+            const values = Object.fromEntries(
+              Object.keys(emptyStoreSettings).map((k) => {
+                const raw = draft[k] ?? "";
+                return [
+                  k,
+                  ["shippingFee", "freeShippingThreshold"].includes(k)
+                    ? raw === ""
+                      ? null
+                      : Math.round(Number(raw) * 100)
+                    : k.endsWith("Days")
+                      ? raw === ""
+                        ? null
+                        : Number(raw)
+                      : raw,
+                ];
               }),
-            });
-            setMessage("Ayarlar kaydedildi.");
-            await load();
-          } catch (e) {
-            setError((e as Error).message);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        {Object.entries(labels).map(([key, label]) => {
-          const k = key as keyof StoreSettings;
-          const value = data.settings.data[k];
-          const monetary = ["shippingFee", "freeShippingThreshold"].includes(k);
-          const numeric = monetary || k.endsWith("Days");
-          return (
-            <label key={`${k}-${data.settings.version}`}>
-              {label}
-              {k.endsWith("Text") ? (
-                <textarea
-                  name={k}
-                  rows={9}
-                  maxLength={30000}
-                  defaultValue={String(value ?? "")}
-                />
-              ) : (
-                <input
-                  name={k}
-                  type={
-                    numeric
-                      ? "number"
-                      : k === "replyTo" || k === "notificationEmail"
-                        ? "email"
-                        : "text"
-                  }
-                  min={0}
-                  step={monetary ? "0.01" : "1"}
-                  defaultValue={
-                    value === null
-                      ? ""
-                      : monetary
-                        ? Number(value) / 100
-                        : String(value)
-                  }
-                />
-              )}
-            </label>
-          );
-        })}
-        <button disabled={busy}>Ayarları kaydet</button>
-        {error && <p role="alert">{error}</p>}
-        {message && <p role="status">{message}</p>}
-      </form>
+            );
+            try {
+              const result = storeSettingsSchema.safeParse(values);
+              if (!result.success) {
+                const keys = result.error.issues.map(
+                  (i) => String(i.path[0]) as keyof StoreSettings,
+                );
+                const target = sections.find((s) =>
+                  s.keys.some((k) => keys.includes(k)),
+                );
+                if (target) setSection(target.id);
+                throw new Error(
+                  `Şu alanları kontrol edin: ${[...new Set(keys.map((k) => labels[k]))].join(", ")}.`,
+                );
+              }
+              await api("/api/admin/commerce?action=settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  data: result.data,
+                  version: data.settings.version,
+                }),
+              });
+              // The write endpoint increments the version atomically; no second request can mask a successful save.
+              install({
+                ...data,
+                settings: {
+                  data: result.data,
+                  version: data.settings.version + 1,
+                },
+              });
+              setMessage(
+                "Değişiklikler kaydedildi. Site güncel ayarları kullanıyor.",
+              );
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <h2>{active.title}</h2>
+          {section === "kargo" && (
+            <p>
+              Ücretsiz kargo eşiği ürün toplamına uygulanır. Toplam teslim
+              süresi, üretim ve kargoyu birlikte kapsar.
+            </p>
+          )}
+          {section === "firma" && (
+            <p>
+              Bu bilgiler siparişin satıcı bilgilerine ve sözleşme kaydına
+              eklenir. Daha sonra tamamlayabilirsiniz.
+            </p>
+          )}
+          {section === "iade" && (
+            <p>
+              Kabul edilen iadelerin gönderileceği adresi buradan belirleyin.
+            </p>
+          )}
+          <fieldset disabled={busy} className="admin-settings-fields">
+            {active.keys.map((k) => {
+              const monetary =
+                k === "shippingFee" || k === "freeShippingThreshold";
+              const numeric = monetary || k.endsWith("Days");
+              const multiline = k.endsWith("Text") || k.endsWith("Address");
+              return (
+                <label key={k}>
+                  {labels[k]}
+                  {multiline ? (
+                    <textarea
+                      name={k}
+                      rows={k.endsWith("Text") ? 10 : 4}
+                      maxLength={k.endsWith("Text") ? 30000 : 500}
+                      value={draft[k] ?? ""}
+                      onChange={(e) => {
+                        setDraft((d) => ({ ...d, [k]: e.target.value }));
+                        setDirty(true);
+                        setMessage("");
+                      }}
+                    />
+                  ) : (
+                    <input
+                      name={k}
+                      type={
+                        numeric
+                          ? "number"
+                          : k === "replyTo" || k === "notificationEmail"
+                            ? "email"
+                            : "text"
+                      }
+                      min={k === "totalDeliveryDays" ? 1 : 0}
+                      max={numeric ? (monetary ? 1000000 : 455) : undefined}
+                      step={monetary ? "0.01" : 1}
+                      maxLength={
+                        k === "sellerTaxNumber"
+                          ? 11
+                          : k === "legalVersion"
+                            ? 100
+                            : 500
+                      }
+                      value={draft[k] ?? ""}
+                      onChange={(e) => {
+                        setDraft((d) => ({ ...d, [k]: e.target.value }));
+                        setDirty(true);
+                        setMessage("");
+                      }}
+                    />
+                  )}
+                </label>
+              );
+            })}
+          </fieldset>
+          {section === "kargo" &&
+            data.settings.data.totalDeliveryDays === null &&
+            data.settings.data.productionDays !== null && (
+              <p className="admin-muted">
+                Önceki süreler: üretim {data.settings.data.productionDays} iş
+                günü, kargo {data.settings.data.deliveryDays ?? "—"} iş günü.
+                Toplam süre girildiğinde sitede bu süre gösterilir.
+              </p>
+            )}
+          {error && (
+            <p className="admin-error" role="alert">
+              {error}
+            </p>
+          )}
+          {message && (
+            <p className="admin-success" role="status">
+              {message}
+            </p>
+          )}
+          <div className="admin-form-end">
+            <span className="admin-muted">
+              {dirty ? "Kaydedilmemiş değişiklikler var." : "Kayıtlı ayarlar"}
+            </span>
+            <button className="admin-primary" disabled={busy || !dirty}>
+              {busy ? "Kaydediliyor…" : "Değişiklikleri kaydet"}
+            </button>
+          </div>
+        </form>
+        <aside className="admin-settings-aside">
+          <h2>Sitede görünen</h2>
+          <p>{deliveryAnnouncement(data.settings.data)}</p>
+          <p>
+            {data.settings.data.freeShippingThreshold === null
+              ? "Ücretsiz kargo eşiği tanımlanmadı."
+              : `${(data.settings.data.freeShippingThreshold / 100).toLocaleString("tr-TR")} TL ve üzeri ücretsiz kargo`}
+          </p>
+          <h2>Satış hazırlığı</h2>
+          {missing.length ? (
+            <ul>
+              {missing.map((k) => (
+                <li key={k}>{labels[k as keyof StoreSettings]}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>Mağaza bilgileri tamamlandı.</p>
+          )}
+          <p className="admin-muted">
+            Eksik bilgileri bölüm bölüm kaydedebilirsiniz. Canlı ödeme, PayTR
+            testi tamamlandıktan sonra açılır.
+          </p>
+          <Link className="admin-inline-link" href="/admin/urunler">
+            Ürün fiyatlarını düzenle
+          </Link>
+          <Link className="admin-inline-link" href="/admin/fiyatlandirma">
+            Özel tasarım fiyatlarını düzenle
+          </Link>
+        </aside>
+      </div>
+    </>
+  );
+}
+function CommerceNotifications({ data }: { data: Summary }) {
+  return (
+    <>
       <h2>Fiyatı eksik aktif ürünler</h2>
       {data.missingPrices.length ? (
         data.missingPrices.map((p) => (
@@ -180,11 +372,6 @@ export function CommercePanel() {
       ) : (
         <p>Eksik ürün fiyatı yok.</p>
       )}
-      <p>
-        <Link href="/admin/fiyatlandirma">
-          Kişiselleştirilmiş tasarım fiyatlarını kontrol edin
-        </Link>
-      </p>
       <h2>Kontrol bekleyen ödemeler</h2>
       {data.payments.map((p) => (
         <p key={p.merchant_oid}>
@@ -218,6 +405,11 @@ export function CommercePanel() {
                 <td>{m.error_code || "—"}</td>
               </tr>
             ))}
+            {!data.emails.length && (
+              <tr>
+                <td colSpan={4}>Henüz e-posta kaydı yok.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

@@ -300,6 +300,7 @@
   background: none !important;
 }
 .root :global(.admin-table-wrap) {
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--line);
   background: #fff;
@@ -916,4 +917,24 @@
   .root :global(.admin-stats article > div) { flex: 1; align-items: center; justify-content: flex-start; }
   .root :global(.admin-stats strong) { margin: 0; font-size: 26px; }
   .root :global(.admin-size-row) { gap: 8px; }
+}
+
+.root :global(.admin-cms-links) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 32px; max-width: 1050px; }
+.root :global(.admin-settings-tabs) { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+.root :global(.admin-settings-tabs button[aria-pressed="true"]) { background: #17191c; color: white; border-color: #17191c; }
+.root :global(.admin-settings-layout) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); gap: 36px; max-width: 1100px; align-items: start; }
+.root :global(.admin-settings-form), .root :global(.admin-settings-aside) { min-width: 0; }
+.root :global(.admin-settings-form h2), .root :global(.admin-settings-aside h2:first-child) { margin-top: 0; }
+.root :global(.admin-settings-fields) { padding: 0; border: 0; margin: 24px 0 0; min-width: 0; }
+.root :global(.admin-settings-aside) { padding: 22px; background: #fff; border: 1px solid var(--line); border-radius: 5px; font-size: 13px; overflow-wrap: anywhere; }
+.root :global(.admin-settings-aside ul) { padding-left: 18px; line-height: 1.9; }
+.root :global(.admin-settings-aside h2) { font-size: 16px; }
+.root :global(.admin-settings-aside .admin-inline-link) { display: flex; }
+.root :global(.admin-menu-backdrop) { display: none; }
+@media (max-width: 1000px) {
+  .root :global(.admin-settings-layout) { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+}
+@media (max-width: 760px) {
+  .root :global(.admin-cms-links) { grid-template-columns: minmax(0, 1fr); }
+  .root :global(.admin-menu-backdrop) { display: block; position: fixed; inset: 64px 0 0; z-index: 28; border: 0; border-radius: 0; background: #0006; padding: 0; width: 100%; }
 }

@@ -21,7 +21,7 @@ export function ContentForm({
     ["hero", "Ana Sayfa"],
     ["favorites", "Favoriler"],
     ["contact", "İletişim"],
-    ["footer", "Footer"],
+    ["footer", "Alt Bilgi"],
     ["faq", "Sık Sorulan Sorular"],
   ];
   return (
@@ -48,7 +48,7 @@ export function ContentForm({
       {tab === "hero" && (
         <div className="admin-editor-grid">
           <div>
-            <h2>Hero Metni</h2>
+            <h2>Ana Sayfa Metni</h2>
             <label>
               Başlık
               <input
@@ -86,7 +86,7 @@ export function ContentForm({
             </label>
           </div>
           <aside>
-            <h2>Hero Görselleri</h2>
+            <h2>Ana Sayfa Görselleri</h2>
             <ImageEditor
               images={value.heroImages}
               onChange={(v) => field("heroImages", v)}
@@ -236,7 +236,7 @@ export function ContentForm({
       )}
       {tab === "footer" && (
         <>
-          <h2>Footer</h2>
+          <h2>Alt Bilgi</h2>
           <label>
             Marka açıklaması
             <textarea
