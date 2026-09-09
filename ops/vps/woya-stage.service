@@ -1,0 +1,21 @@
+[Unit]
+Description=WOYA candidate release checks
+After=network-online.target
+
+[Service]
+Type=simple
+User=woya
+Group=woya
+WorkingDirectory=/var/www/woya-candidate
+LoadCredential=runtime:/etc/woya/runtime.json
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=NODE_OPTIONS=--max-old-space-size=384
+ExecStart=/usr/bin/node /usr/local/lib/woya/run.mjs node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3181
+MemoryMax=512M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/woya-releases /var/lib/woya/uploads
+UMask=0027

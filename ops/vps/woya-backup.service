@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up WOYA database and uploaded images
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/woya/backup.sh
+Nice=15
+IOSchedulingClass=idle

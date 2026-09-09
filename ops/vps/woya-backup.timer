@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily WOYA database and media backup
+
+[Timer]
+OnCalendar=*-*-* 03:40:00
+Persistent=true
+RandomizedDelaySec=10min
+Unit=woya-backup.service
+
+[Install]
+WantedBy=timers.target

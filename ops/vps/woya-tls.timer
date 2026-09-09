@@ -1,0 +1,10 @@
+[Unit]
+Description=Check WOYA DNS for initial HTTPS setup
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+Unit=woya-tls.service
+
+[Install]
+WantedBy=timers.target

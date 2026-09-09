@@ -1,0 +1,8 @@
+[Unit]
+Description=Enable WOYA HTTPS when DNS points to this VPS
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/woya/tls.sh
+TimeoutStartSec=5min

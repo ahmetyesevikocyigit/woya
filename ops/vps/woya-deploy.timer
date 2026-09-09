@@ -1,0 +1,11 @@
+[Unit]
+Description=Check WOYA GitHub main every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+RandomizedDelaySec=10s
+Unit=woya-deploy.service
+
+[Install]
+WantedBy=timers.target
