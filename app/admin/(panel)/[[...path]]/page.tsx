@@ -1,3 +1,4 @@
+import { CommercePanel } from "../../ui/commerce";
 import { CustomerService } from "../../ui/customer-service";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -55,7 +56,8 @@ export default async function AdminPage({
     if (id) {
       if (id !== "yeni" && !z.uuid().safeParse(id).success) notFound();
       const [product, categories] = await Promise.all([
-        id === "yeni" ? undefined : getProduct(id), getCategories(),
+        id === "yeni" ? undefined : getProduct(id),
+        getCategories(),
       ]);
       if (id !== "yeni" && !product) notFound();
       title = product ? "Ürünü Düzenle" : "Yeni Ürün";
@@ -67,17 +69,36 @@ export default async function AdminPage({
         />
       );
     } else {
-      const [products, categories] = await Promise.all([getProducts(), getCategories()]);
+      const [products, categories] = await Promise.all([
+        getProducts(),
+        getCategories(),
+      ]);
       title = "Ürünler";
-      content = <ProductsTable products={products.map((p) => ({
-        id: p.id, code: p.code, slug: p.slug, title: p.title, categoryId: p.categoryId,
-        active: p.active, featured: p.featured, type: p.type, price: p.price,
-        salePrice: p.salePrice, images: p.images.slice(0, 1),
-      }))} categories={categories} />;
+      content = (
+        <ProductsTable
+          products={products.map((p) => ({
+            id: p.id,
+            code: p.code,
+            slug: p.slug,
+            title: p.title,
+            categoryId: p.categoryId,
+            active: p.active,
+            featured: p.featured,
+            type: p.type,
+            price: p.price,
+            salePrice: p.salePrice,
+            images: p.images.slice(0, 1),
+          }))}
+          categories={categories}
+        />
+      );
     }
   } else if (section === "kategoriler" && !id) {
     title = "Kategoriler";
-    const [categories, products] = await Promise.all([getCategories(), getProducts()]);
+    const [categories, products] = await Promise.all([
+      getCategories(),
+      getProducts(),
+    ]);
     content = (
       <Categories
         key={categories.map((c) => c.version).join("-")}
@@ -130,6 +151,9 @@ export default async function AdminPage({
   } else if (section === "medya" && !id) {
     title = "Görsel Kütüphanesi";
     content = <MediaLibrary />;
+  } else if (section === "magaza" && !id) {
+    title = "Mağaza ve Bildirimler";
+    content = <CommercePanel />;
   } else if (section === "guvenlik" && !id) {
     title = "Güvenlik";
     content = <SecurityPanel summary={await securitySummary()} />;
@@ -160,11 +184,27 @@ export default async function AdminPage({
         <nav className="admin-quick-links" aria-label="Hızlı işlemler">
           {[
             { href: "/admin/urunler/yeni", label: "Ürün ekle", icon: Plus },
-            { href: "/admin/fiyatlandirma", label: "Ölçü ve fiyatları düzenle", icon: Ruler },
-            { href: "/admin/icerik", label: "Site içeriğini düzenle", icon: FileText },
-            { href: "/admin/siparisler", label: "Siparişleri görüntüle", icon: ClipboardList },
+            {
+              href: "/admin/fiyatlandirma",
+              label: "Ölçü ve fiyatları düzenle",
+              icon: Ruler,
+            },
+            {
+              href: "/admin/icerik",
+              label: "Site içeriğini düzenle",
+              icon: FileText,
+            },
+            {
+              href: "/admin/siparisler",
+              label: "Siparişleri görüntüle",
+              icon: ClipboardList,
+            },
           ].map(({ href, label, icon: Icon }) => (
-            <Link href={href} key={href}><Icon size={19} /><span>{label}</span><ArrowUpRight size={17} /></Link>
+            <Link href={href} key={href}>
+              <Icon size={19} />
+              <span>{label}</span>
+              <ArrowUpRight size={17} />
+            </Link>
           ))}
         </nav>
       </>

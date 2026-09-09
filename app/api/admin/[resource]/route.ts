@@ -1,3 +1,4 @@
+import { enqueueOrderEmail } from "@/lib/commerce/outbox";
 import { orderTransitions } from "@/lib/customer/schema";
 import { randomUUID } from "node:crypto";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -108,6 +109,14 @@ export async function POST(request: Request, context: Context) {
             "Bu sipariş durum geçişine izin verilmiyor.",
           );
         const shipment = data.shipment ?? order?.shipment ?? null;
+        if (
+          data.status === "kargoda" &&
+          (!shipment?.carrier || !shipment?.trackingNumber)
+        )
+          throw new HttpError(
+            400,
+            "Kargoya vermek için firma ve takip numarası gerekli.",
+          );
         const rows =
           await tx`UPDATE woya_orders SET status=${data.status},internal_note=${data.internalNote},shipment=${shipment ? tx.json(shipment) : null},version=version+1,
           history=history || ${tx.json([{ status: data.status, at: new Date().toISOString() }, ...(data.shipment && JSON.stringify(data.shipment) !== JSON.stringify(order?.shipment) ? [{ status: "Kargo takip bilgileri güncellendi", at: new Date().toISOString() }] : [])])}::jsonb
@@ -116,6 +125,26 @@ export async function POST(request: Request, context: Context) {
           throw new HttpError(
             409,
             "Sipariş başka bir sekmede güncellenmiş. Sayfayı yenileyin.",
+          );
+        if (
+          data.status === "kargoda" &&
+          (order?.status !== "kargoda" ||
+            JSON.stringify(shipment) !== JSON.stringify(order?.shipment))
+        )
+          await enqueueOrderEmail(
+            tx,
+            id,
+            `shipment:${id}:${data.version + 1}`,
+            "Siparişiniz kargoya verildi",
+            `${shipment.carrier} · Takip numarası: ${shipment.trackingNumber}`,
+          );
+        if (data.status === "iptal" && order?.status !== "iptal")
+          await enqueueOrderEmail(
+            tx,
+            id,
+            `cancel:${id}`,
+            "Siparişiniz iptal edildi",
+            "Para iadesi gerçekleştiğinde ayrıca bilgilendirileceksiniz.",
           );
       } else throw new HttpError(404, "İşlem bulunamadı.");
       await tx`INSERT INTO woya_audit(actor,action,entity) VALUES(${actor},${`${resource}:save`},${id})`;

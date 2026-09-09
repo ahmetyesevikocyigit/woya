@@ -192,7 +192,19 @@ export type OrderItem = {
   options: string[];
 };
 export type Order = {
-  billing?: { name: string; address: string } | null;
+  legalSnapshot?: {
+    version: string;
+    acceptedAt: string;
+    store: import("../commerce/schema").StoreSettings;
+  } | null;
+  billing?: {
+    name: string;
+    address: string;
+    type?: string;
+    companyName?: string;
+    taxOffice?: string;
+    taxNumber?: string;
+  } | null;
   shipment?: { carrier: string; trackingNumber: string } | null;
   payment?: import("../payments/schema").PaymentSummary | null;
   id: string;

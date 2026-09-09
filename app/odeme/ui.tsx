@@ -7,7 +7,7 @@ import { ArrowLeft, CreditCard, LoaderCircle } from "lucide-react";
 import { useCart } from "../components/cart-provider";
 import type { CheckoutQuote } from "@/lib/payments/schema";
 import type { AccountData } from "@/lib/customer/types";
-import { billingSchema } from "@/lib/customer/schema";
+import { checkoutBillingSchema } from "@/lib/customer/schema";
 import { customerSchema } from "@/lib/payments/schema";
 import styles from "./payment.module.css";
 
@@ -29,6 +29,7 @@ export function CheckoutForm({
   enabled: boolean;
   account: AccountData;
 }) {
+  const [billingType, setBillingType] = useState("individual");
   const formRef = useRef<HTMLFormElement>(null);
   const delivery = account.addresses.find((a) => a.deliveryDefault);
   const billing = account.addresses.find((a) => a.billingDefault);
@@ -140,16 +141,26 @@ export function CheckoutForm({
               setError(customer.error.issues.map((i) => i.message).join(" "));
               return;
             }
-            const billingInput = billingSchema.safeParse(
-              differentBilling
+            const billingInput = checkoutBillingSchema.safeParse({
+              type: billingType,
+              ...(billingType === "company"
+                ? {
+                    companyName: data.get("companyName"),
+                    taxOffice: data.get("taxOffice"),
+                    taxNumber: data.get("taxNumber"),
+                  }
+                : {}),
+              ...(differentBilling
                 ? {
                     name: data.get("billing_name"),
                     address: data.get("billing_address"),
                   }
-                : { name: customer.data.name, address: customer.data.address },
-            );
+                : { name: customer.data.name, address: customer.data.address }),
+            });
             if (!billingInput.success) {
-              setError("Fatura adını ve açık adresini kontrol edin.");
+              setError(
+                billingInput.error.issues.map((i) => i.message).join(" "),
+              );
               return;
             }
             inFlight.current = true;
@@ -272,6 +283,39 @@ export function CheckoutForm({
               />
               <span>Fatura adresim farklı</span>
             </label>
+            <label>
+              Fatura türü
+              <select
+                aria-label="Fatura türü"
+                value={billingType}
+                onChange={(e) => setBillingType(e.target.value)}
+              >
+                <option value="individual">Bireysel</option>
+                <option value="company">Kurumsal</option>
+              </select>
+            </label>
+            {billingType === "company" && (
+              <>
+                <label>
+                  Şirket unvanı
+                  <input name="companyName" required maxLength={200} />
+                </label>
+                <label>
+                  Vergi dairesi
+                  <input name="taxOffice" required maxLength={100} />
+                </label>
+                <label>
+                  Vergi numarası
+                  <input
+                    name="taxNumber"
+                    required
+                    inputMode="numeric"
+                    pattern="[0-9]{10,11}"
+                    maxLength={11}
+                  />
+                </label>
+              </>
+            )}
             {differentBilling && (
               <>
                 <h2>Fatura bilgileri</h2>
@@ -320,6 +364,28 @@ export function CheckoutForm({
               Sipariş notu (isteğe bağlı)
               <textarea name="note" maxLength={1000} rows={2} />
             </label>
+            {summary && (
+              <details>
+                <summary>Sipariş ön bilgilendirmesi ve sözleşme</summary>
+                <p>
+                  {summary.quote.store.sellerName} ·{" "}
+                  {summary.quote.store.sellerAddress}
+                </p>
+                <p>
+                  Üretim: {summary.quote.store.productionDays} iş günü. Kargo:{" "}
+                  {summary.quote.store.deliveryDays} iş günü.
+                </p>
+                {[
+                  summary.quote.store.informationText,
+                  summary.quote.store.termsText,
+                ].map((text, i) => (
+                  <p style={{ whiteSpace: "pre-wrap" }} key={i}>
+                    {text ||
+                      "Test işlemi — satış sözleşmesi henüz tamamlanmadı."}
+                  </p>
+                ))}
+              </details>
+            )}
             <label className={styles.consent}>
               <input type="checkbox" name="consent" required />
               <span>

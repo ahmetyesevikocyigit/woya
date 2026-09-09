@@ -24,7 +24,8 @@ export const getPricingRecord = cache(async () => {
 export const getPricing = async () => (await getPricingRecord()).data;
 
 async function readProducts(id?: string): Promise<ProductRecord[]> {
-  if (!databaseConfigured()) return initialProducts().filter((p) => !id || p.id === id);
+  if (!databaseConfigured())
+    return initialProducts().filter((p) => !id || p.id === id);
   const rows = id
     ? await db()`SELECT * FROM woya_products WHERE id=${id}`
     : await db()`SELECT * FROM woya_products ORDER BY created_at DESC, code`;
@@ -55,11 +56,14 @@ export const getCategories = cache(async () => {
   await connection();
   return readCategories();
 });
-async function readContentRecord(): Promise<{ data: SiteContent; version: number }> {
-    if (!databaseConfigured()) return { data: initialContent, version: 1 };
-    const [row] = await db()`SELECT * FROM woya_content WHERE id='site'`;
-    if (!row) throw new Error("CONTENT_NOT_INITIALIZED");
-    return { data: resolveLegalContent(row.data), version: row.version };
+async function readContentRecord(): Promise<{
+  data: SiteContent;
+  version: number;
+}> {
+  if (!databaseConfigured()) return { data: initialContent, version: 1 };
+  const [row] = await db()`SELECT * FROM woya_content WHERE id='site'`;
+  if (!row) throw new Error("CONTENT_NOT_INITIALIZED");
+  return { data: resolveLegalContent(row.data), version: row.version };
 }
 export const getContentRecord = cache(async () => {
   await connection();
@@ -73,7 +77,9 @@ const cacheScope = createHash("sha256")
   .digest("hex");
 export async function readCatalog() {
   const [products, categories, pricing] = await Promise.all([
-    readProducts(), readCategories(), readPricingRecord(),
+    readProducts(),
+    readCategories(),
+    readPricingRecord(),
   ]);
   return { products, categories, pricing: pricing.data };
 }
@@ -95,18 +101,24 @@ export const getContent = cache(async () => {
   await connection();
   return cachedContent();
 });
-export const getStorefrontPricing = async () => (await getStorefrontCatalog()).pricing;
+export const getStorefrontPricing = async () =>
+  (await getStorefrontCatalog()).pricing;
 
 export async function getDashboardSummary() {
   const [row] = await db()`SELECT
     (SELECT count(*)::int FROM woya_products) AS products,
     (SELECT count(*)::int FROM woya_products WHERE (data->>'active')::boolean) AS active,
     (SELECT count(*)::int FROM woya_orders) AS orders`;
-  return { products: Number(row.products), active: Number(row.active), orders: Number(row.orders) };
+  return {
+    products: Number(row.products),
+    active: Number(row.active),
+    orders: Number(row.orders),
+  };
 }
 type OrderRow = Omit<Order, "createdAt" | "internalNote"> & {
   created_at: Date;
   internal_note: string;
+  legal_snapshot?: Order["legalSnapshot"];
 };
 function toOrder(r: OrderRow): Order {
   return {
@@ -123,6 +135,7 @@ function toOrder(r: OrderRow): Order {
     payment: r.payment,
     billing: r.billing,
     shipment: r.shipment,
+    legalSnapshot: r.legal_snapshot,
   };
 }
 export async function getOrders(): Promise<Order[]> {

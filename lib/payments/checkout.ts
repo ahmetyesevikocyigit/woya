@@ -5,9 +5,12 @@ import { HttpError } from "../admin/auth";
 import { storefrontQuoteData } from "../storefront";
 import { quoteItem } from "../quote";
 import { cartKey } from "../cart-key";
-import { paymentConfig, shippingFee } from "./config";
+import { paymentConfig } from "./config";
 import { toKurus } from "./protocol";
 import type { CheckoutItem, CheckoutQuote } from "./schema";
+
+import { checkoutSettings } from "../commerce/settings";
+import { configuredShipping } from "../commerce/schema";
 
 const cookieName = "woya-checkout";
 export const digest = (value: string) =>
@@ -55,8 +58,15 @@ export async function checkoutQuote(
     (sum, item) => sum + toKurus(item.unitPrice) * item.quantity,
     0,
   );
-  const shipping = shippingFee(subtotal);
+  const store = await checkoutSettings();
+  const shipping = configuredShipping(subtotal, store)!;
   const total = toKurus((subtotal + shipping) / 100);
-  const data = { items: lines, subtotal, shipping, total };
+  const data = {
+    items: lines,
+    subtotal,
+    shipping,
+    total,
+    store: { ...store, notificationEmail: "" },
+  };
   return { ...data, hash: digest(JSON.stringify(data)) };
 }

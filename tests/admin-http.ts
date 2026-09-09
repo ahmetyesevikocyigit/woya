@@ -46,6 +46,7 @@ async function main() {
     await pg.exec(await readFile("db/002-admin-security.sql", "utf8"));
     await pg.exec(await readFile("db/003-paytr.sql", "utf8"));
     await pg.exec(await readFile("db/004-customer-accounts.sql", "utf8"));
+    await pg.exec(await readFile("db/005-commerce.sql", "utf8"));
     for (const c of initialCategories)
       await pg.query("INSERT INTO woya_categories(id,data) VALUES($1,$2)", [
         c.id,
@@ -54,10 +55,23 @@ async function main() {
     for (const p of initialProducts())
       await pg.query(
         "INSERT INTO woya_products(id,slug,code,category_id,data) VALUES($1,$2,$3,$4,$5)",
-        [randomUUID(), p.slug, p.code, p.categoryId, JSON.stringify({ ...p, price: 1500, salePrice: 1250 })],
+        [
+          randomUUID(),
+          p.slug,
+          p.code,
+          p.categoryId,
+          JSON.stringify({ ...p, price: 1500, salePrice: 1250 }),
+        ],
       );
     await pg.query("INSERT INTO woya_content(id,data) VALUES('site',$1)", [
-      JSON.stringify({ ...initialContent, email: "", address: "", footerLinks: initialContent.footerLinks.map((link) => link.group === "Yasal" ? { ...link, href: "/iletisim" } : link) }),
+      JSON.stringify({
+        ...initialContent,
+        email: "",
+        address: "",
+        footerLinks: initialContent.footerLinks.map((link) =>
+          link.group === "Yasal" ? { ...link, href: "/iletisim" } : link,
+        ),
+      }),
     ]);
     await socket.start();
     const password = randomBytes(18).toString("hex");
@@ -135,14 +149,33 @@ async function main() {
     for (const page of legalPages) {
       const response = await fetch(`${base}${legalHref(page.slug)}`);
       const html = await response.text();
-      check(response.status === 200 && html.includes(`id="legal-title"`), `${page.slug}: legal page renders`);
-      check(html.includes("info@woya.com.tr") && html.includes("120. Sk. No:18"), `${page.slug}: confirmed contact details replace empty legacy fields`);
-      const footerLegal = html.match(/<nav[^>]*aria-label="Yasal"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? "";
-      check(legalPages.every((item) => footerLegal.includes(`href="${legalHref(item.slug)}"`)), `${page.slug}: four working legal footer links`);
-      check(!html.includes('class="subpage-hero"'), `${page.slug}: plain page without hero`);
+      check(
+        response.status === 200 && html.includes(`id="legal-title"`),
+        `${page.slug}: legal page renders`,
+      );
+      check(
+        html.includes("info@woya.com.tr") && html.includes("120. Sk. No:18"),
+        `${page.slug}: confirmed contact details replace empty legacy fields`,
+      );
+      const footerLegal =
+        html.match(/<nav[^>]*aria-label="Yasal"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ??
+        "";
+      check(
+        legalPages.every((item) =>
+          footerLegal.includes(`href="${legalHref(item.slug)}"`),
+        ),
+        `${page.slug}: four working legal footer links`,
+      );
+      check(
+        !html.includes('class="subpage-hero"'),
+        `${page.slug}: plain page without hero`,
+      );
     }
     const legalSitemap = await (await fetch(`${base}/sitemap.xml`)).text();
-    check(legalPages.every((page) => legalSitemap.includes(legalHref(page.slug))), "legal routes are in sitemap");
+    check(
+      legalPages.every((page) => legalSitemap.includes(legalHref(page.slug))),
+      "legal routes are in sitemap",
+    );
     const unknownLegal = await fetch(`${base}/yasal/olmayan-belge`);
     check(unknownLegal.status === 404, "unknown legal slug returns 404");
     const anonymous = await fetch(`${base}/admin`, { redirect: "manual" });
@@ -209,19 +242,30 @@ async function main() {
         !text.includes(hash) && !text.includes(password),
         `${route} excludes secrets`,
       );
-      if (route === "/admin") check(
-        !text.includes("Düşük Stok") && !text.includes("Son Eklenen Ürünler") && text.includes('aria-label="Hızlı işlemler"'),
-        "Dashboard keeps useful actions without inventory or recent-product panels",
-      );
-      if (route.startsWith("/admin/urunler")) check(
-        !text.includes("<th>Stok</th>") && !text.includes("Stok adedi") && !text.includes("Düşük stok"),
-        `${route} has no inventory controls`,
-      );
-      if (route === "/admin/urunler") check(text.includes("/_next/image"), "Admin product thumbnails use resized images");
-      if (route === "/admin/urunler/yeni" || route === "/admin/icerik") check(
-        !text.includes('aria-label="Görsel ara"'),
-        `${route} does not mount the media library before opening the picker`,
-      );
+      if (route === "/admin")
+        check(
+          !text.includes("Düşük Stok") &&
+            !text.includes("Son Eklenen Ürünler") &&
+            text.includes('aria-label="Hızlı işlemler"'),
+          "Dashboard keeps useful actions without inventory or recent-product panels",
+        );
+      if (route.startsWith("/admin/urunler"))
+        check(
+          !text.includes("<th>Stok</th>") &&
+            !text.includes("Stok adedi") &&
+            !text.includes("Düşük stok"),
+          `${route} has no inventory controls`,
+        );
+      if (route === "/admin/urunler")
+        check(
+          text.includes("/_next/image"),
+          "Admin product thumbnails use resized images",
+        );
+      if (route === "/admin/urunler/yeni" || route === "/admin/icerik")
+        check(
+          !text.includes('aria-label="Görsel ara"'),
+          `${route} does not mount the media library before opening the picker`,
+        );
     }
     const pricing = { ...initialPricing, panelRate: 2000, clockRate: 3000 };
     check(
@@ -251,13 +295,38 @@ async function main() {
       unavailable.quotes[0].price === null,
       "No invented price before admin configures rates",
     );
-    const standardRequest = { items: [{ slug: measured.slug, quantity: 1, configuration: { ...configuration, pricingMode: "standard" } }] };
-    const standardBeforeRates = await (await api("/api/sepet/fiyat", standardRequest)).json();
-    check(standardBeforeRates.quotes[0].price === 1250, "Standard product can be purchased before m² rates are configured");
-    const standardProductHtml = await (await fetch(`${base}/urunler/${measured.slug}`)).text();
-    check(standardProductHtml.includes("1.250") && !standardProductHtml.includes("Bu ürün için fiyat henüz tanımlanmadı."), "Product page uses seller discount even without m² rates");
-    const editorHtml = await (await fetch(`${base}/admin/urunler/yeni`, { headers: { cookie } })).text();
-    check(editorHtml.includes("Fiyat (₺)") && editorHtml.includes("İndirimli fiyat (₺)"), "Admin can enter standard prices for every product type");
+    const standardRequest = {
+      items: [
+        {
+          slug: measured.slug,
+          quantity: 1,
+          configuration: { ...configuration, pricingMode: "standard" },
+        },
+      ],
+    };
+    const standardBeforeRates = await (
+      await api("/api/sepet/fiyat", standardRequest)
+    ).json();
+    check(
+      standardBeforeRates.quotes[0].price === 1250,
+      "Standard product can be purchased before m² rates are configured",
+    );
+    const standardProductHtml = await (
+      await fetch(`${base}/urunler/${measured.slug}`)
+    ).text();
+    check(
+      standardProductHtml.includes("1.250") &&
+        !standardProductHtml.includes("Bu ürün için fiyat henüz tanımlanmadı."),
+      "Product page uses seller discount even without m² rates",
+    );
+    const editorHtml = await (
+      await fetch(`${base}/admin/urunler/yeni`, { headers: { cookie } })
+    ).text();
+    check(
+      editorHtml.includes("Fiyat (₺)") &&
+        editorHtml.includes("İndirimli fiyat (₺)"),
+      "Admin can enter standard prices for every product type",
+    );
     check(
       (await api("/api/admin/pricing", { version: 0, data: pricing }))
         .status === 200,
@@ -284,8 +353,13 @@ async function main() {
       firstQuote.quotes[0].price === 2480,
       "Server calculates two linked panels plus clock",
     );
-    const beforeRateChange = await (await fetch(`${base}/urunler/${measured.slug}`)).text();
-    check(beforeRateChange.includes("1.250"), "Storefront shows seller price, not the custom m² price");
+    const beforeRateChange = await (
+      await fetch(`${base}/urunler/${measured.slug}`)
+    ).text();
+    check(
+      beforeRateChange.includes("1.250"),
+      "Storefront shows seller price, not the custom m² price",
+    );
     check(
       (
         await api("/api/admin/pricing", {
@@ -296,14 +370,21 @@ async function main() {
       "Admin changes m² price",
     );
     const repriced = await (await api("/api/sepet/fiyat", quoteRequest)).json();
-    const standardAfterRates = await (await api("/api/sepet/fiyat", standardRequest)).json();
-    check(standardAfterRates.quotes[0].price === 1250, "Cart standard price is independent of changed m² rates");
+    const standardAfterRates = await (
+      await api("/api/sepet/fiyat", standardRequest)
+    ).json();
+    check(
+      standardAfterRates.quotes[0].price === 1250,
+      "Cart standard price is independent of changed m² rates",
+    );
     check(
       repriced.quotes[0].price === 3880,
       "Same cart configuration uses updated database rate",
     );
     check(
-      (await (await fetch(`${base}/urunler/${measured.slug}`)).text()).includes("1.250"),
+      (await (await fetch(`${base}/urunler/${measured.slug}`)).text()).includes(
+        "1.250",
+      ),
       "Admin custom rate changes do not affect the standard product price",
     );
     check(
@@ -492,25 +573,92 @@ async function main() {
         detail.includes("İki tablonun ortak ölçüsü"),
       "Storefront sees current title, linked dimensions and seller discount price",
     );
-    await pg.query("UPDATE woya_products SET data=jsonb_set(data,'{active}','false') WHERE id=$1", [id]);
+    await pg.query(
+      "UPDATE woya_products SET data=jsonb_set(data,'{active}','false') WHERE id=$1",
+      [id],
+    );
     check(
-      (await (await fetch(`${base}/urunler/${product.slug}`)).text()).includes("Güncel HTTP Ürünü"),
+      (await (await fetch(`${base}/urunler/${product.slug}`)).text()).includes(
+        "Güncel HTTP Ürünü",
+      ),
       "Repeated storefront reads reuse cached catalogue data",
     );
-    const closedQuote = await (await api("/api/sepet/fiyat", {
-      items: [{ slug: product.slug, quantity: 1, configuration: { source: "product", dimensions: defaultDimensions(pricing, "rectangle") } }],
-    })).json();
-    check(closedQuote.quotes[0].price === null, "Live cart validation rejects inactive products even with a warm display cache");
-    await pg.query("UPDATE woya_products SET data=jsonb_set(jsonb_set(data,'{active}','true'),'{stock}','0') WHERE id=$1", [id]);
-    const legacyStockQuote = await (await api("/api/sepet/fiyat", {
-      items: [{ slug: product.slug, quantity: 6, configuration: { source: "product", dimensions: defaultDimensions(pricing, "rectangle") } }],
-    })).json();
-    check(legacyStockQuote.quotes[0].price === 1250, "Published products keep seller price regardless of legacy stock counts");
-    check((await api("/api/admin/products", { id, version: 2, data: { ...product, title: "Güncel HTTP Ürünü", salePrice: 1150 } })).status === 200, "Seller updates the product discount price");
-    const updatedPriceHtml = await (await fetch(`${base}/urunler/${product.slug}`)).text();
-    check(updatedPriceHtml.includes("1.150"), "Product price save invalidates the storefront display cache");
-    const updatedStandardQuote = await (await api("/api/sepet/fiyat", { items: [{ slug: product.slug, quantity: 1, configuration: { source: "product", dimensions: configuration.dimensions, pricingMode: "standard" } }] })).json();
-    check(updatedStandardQuote.quotes[0].price === 1150, "Cart immediately uses the updated seller price");
+    const closedQuote = await (
+      await api("/api/sepet/fiyat", {
+        items: [
+          {
+            slug: product.slug,
+            quantity: 1,
+            configuration: {
+              source: "product",
+              dimensions: defaultDimensions(pricing, "rectangle"),
+            },
+          },
+        ],
+      })
+    ).json();
+    check(
+      closedQuote.quotes[0].price === null,
+      "Live cart validation rejects inactive products even with a warm display cache",
+    );
+    await pg.query(
+      "UPDATE woya_products SET data=jsonb_set(jsonb_set(data,'{active}','true'),'{stock}','0') WHERE id=$1",
+      [id],
+    );
+    const legacyStockQuote = await (
+      await api("/api/sepet/fiyat", {
+        items: [
+          {
+            slug: product.slug,
+            quantity: 6,
+            configuration: {
+              source: "product",
+              dimensions: defaultDimensions(pricing, "rectangle"),
+            },
+          },
+        ],
+      })
+    ).json();
+    check(
+      legacyStockQuote.quotes[0].price === 1250,
+      "Published products keep seller price regardless of legacy stock counts",
+    );
+    check(
+      (
+        await api("/api/admin/products", {
+          id,
+          version: 2,
+          data: { ...product, title: "Güncel HTTP Ürünü", salePrice: 1150 },
+        })
+      ).status === 200,
+      "Seller updates the product discount price",
+    );
+    const updatedPriceHtml = await (
+      await fetch(`${base}/urunler/${product.slug}`)
+    ).text();
+    check(
+      updatedPriceHtml.includes("1.150"),
+      "Product price save invalidates the storefront display cache",
+    );
+    const updatedStandardQuote = await (
+      await api("/api/sepet/fiyat", {
+        items: [
+          {
+            slug: product.slug,
+            quantity: 1,
+            configuration: {
+              source: "product",
+              dimensions: configuration.dimensions,
+              pricingMode: "standard",
+            },
+          },
+        ],
+      })
+    ).json();
+    check(
+      updatedStandardQuote.quotes[0].price === 1150,
+      "Cart immediately uses the updated seller price",
+    );
     check(
       (await api("/api/admin/media", undefined, "GET")).status === 200,
       "Media library lists real images",
@@ -534,43 +682,177 @@ async function main() {
         "image/webp",
       "Uploaded file served from durable path",
     );
-    const crop = { source: uploaded.url, regions: defaultRegions(true), save: false };
-    const originalBytes = Buffer.from(await (await fetch(base + uploaded.url)).arrayBuffer());
-    const mediaBefore = (await pg.query("SELECT url FROM woya_media")).rows.length;
-    check((await api("/api/admin/crop", crop, "POST", "https://evil.test")).status === 403, "Crop rejects foreign origins");
-    check((await api("/api/admin/crop", { ...crop, source: "http://127.0.0.1/private" })).status === 400, "Crop rejects SSRF URLs");
-    check((await api("/api/admin/crop", { ...crop, source: "/images/../../.env.png" })).status === 400, "Crop rejects path traversal");
-    check((await api("/api/admin/crop", { ...crop, source: "https://unknown.public.blob.vercel-storage.com/woya/image.webp" })).status === 400, "Crop rejects unregistered Blob sources before network access");
-    check((await api("/api/admin/crop", { ...crop, regions: { ...crop.regions, right: undefined } })).status === 400, "Crop rejects incomplete set selections");
+    const crop = {
+      source: uploaded.url,
+      regions: defaultRegions(true),
+      save: false,
+    };
+    const originalBytes = Buffer.from(
+      await (await fetch(base + uploaded.url)).arrayBuffer(),
+    );
+    const mediaBefore = (await pg.query("SELECT url FROM woya_media")).rows
+      .length;
+    check(
+      (await api("/api/admin/crop", crop, "POST", "https://evil.test"))
+        .status === 403,
+      "Crop rejects foreign origins",
+    );
+    check(
+      (
+        await api("/api/admin/crop", {
+          ...crop,
+          source: "http://127.0.0.1/private",
+        })
+      ).status === 400,
+      "Crop rejects SSRF URLs",
+    );
+    check(
+      (
+        await api("/api/admin/crop", {
+          ...crop,
+          source: "/images/../../.env.png",
+        })
+      ).status === 400,
+      "Crop rejects path traversal",
+    );
+    check(
+      (
+        await api("/api/admin/crop", {
+          ...crop,
+          source:
+            "https://unknown.public.blob.vercel-storage.com/woya/image.webp",
+        })
+      ).status === 400,
+      "Crop rejects unregistered Blob sources before network access",
+    );
+    check(
+      (
+        await api("/api/admin/crop", {
+          ...crop,
+          regions: { ...crop.regions, right: undefined },
+        })
+      ).status === 400,
+      "Crop rejects incomplete set selections",
+    );
     const previewResponse = await api("/api/admin/crop", crop);
     const preview = await previewResponse.json();
-    check(previewResponse.status === 200 && Object.keys(preview.images).length === 3, "Crop generates all three perspective previews");
-    check((await pg.query("SELECT url FROM woya_media")).rows.length === mediaBefore, "Preview creates no permanent media");
+    check(
+      previewResponse.status === 200 &&
+        Object.keys(preview.images).length === 3,
+      "Crop generates all three perspective previews",
+    );
+    check(
+      (await pg.query("SELECT url FROM woya_media")).rows.length ===
+        mediaBefore,
+      "Preview creates no permanent media",
+    );
     const savedResponse = await api("/api/admin/crop", { ...crop, save: true });
     const savedCrop = await savedResponse.json();
-    check(savedResponse.status === 200 && savedCrop.parts.center.startsWith("/media/"), "Confirmed crops use durable storage");
-    check((await pg.query("SELECT url FROM woya_media")).rows.length === mediaBefore + 3, "Confirmed crops appear in media library");
+    check(
+      savedResponse.status === 200 &&
+        savedCrop.parts.center.startsWith("/media/"),
+      "Confirmed crops use durable storage",
+    );
+    check(
+      (await pg.query("SELECT url FROM woya_media")).rows.length ===
+        mediaBefore + 3,
+      "Confirmed crops appear in media library",
+    );
     for (const part of ["left", "center", "right"] as const) {
       const response = await fetch(base + savedCrop.parts[part]);
-      const metadata = await sharp(Buffer.from(await response.arrayBuffer())).metadata();
-      check(response.status === 200 && Math.max(metadata.width!, metadata.height!) === 1024, `${part} crop is readable and resolution bounded`);
+      const metadata = await sharp(
+        Buffer.from(await response.arrayBuffer()),
+      ).metadata();
+      check(
+        response.status === 200 &&
+          Math.max(metadata.width!, metadata.height!) === 1024,
+        `${part} crop is readable and resolution bounded`,
+      );
     }
-    check(originalBytes.equals(Buffer.from(await (await fetch(base + uploaded.url)).arrayBuffer())), "Cropping leaves original photo unchanged");
-    const cropProduct = { ...product, slug: "crop-test-product", title: "Kırpılmış Yeni Ürün", type: "set", builderParts: savedCrop.parts };
+    check(
+      originalBytes.equals(
+        Buffer.from(await (await fetch(base + uploaded.url)).arrayBuffer()),
+      ),
+      "Cropping leaves original photo unchanged",
+    );
+    const cropProduct = {
+      ...product,
+      slug: "crop-test-product",
+      title: "Kırpılmış Yeni Ürün",
+      type: "set",
+      builderParts: savedCrop.parts,
+    };
     const cropCreated = await api("/api/admin/products", { data: cropProduct });
     const cropId = (await cropCreated.json()).id;
-    check(cropCreated.status === 200, "Product saves its crop definitions and assets");
-    const cropRow = (await pg.query<{ code: string; data: typeof cropProduct }>("SELECT code,data FROM woya_products WHERE id=$1", [cropId])).rows[0];
-    check(cropRow.data.builderParts.center === savedCrop.parts.center, "Crop configuration survives database readback");
+    check(
+      cropCreated.status === 200,
+      "Product saves its crop definitions and assets",
+    );
+    const cropRow = (
+      await pg.query<{ code: string; data: typeof cropProduct }>(
+        "SELECT code,data FROM woya_products WHERE id=$1",
+        [cropId],
+      )
+    ).rows[0];
+    check(
+      cropRow.data.builderParts.center === savedCrop.parts.center,
+      "Crop configuration survives database readback",
+    );
     const cropHome = await (await fetch(base)).text();
-    check(cropHome.includes(savedCrop.parts.left), "Storefront immediately receives newly saved custom parts");
-    const cropQuoteRequest = { items: [{ slug: "ozel-set", quantity: 1, configuration: { source: "builder", kind: "set", left: cropRow.code, right: cropRow.code, clock: cropRow.code, numeral: "original", dimensions: defaultDimensions(pricing, "rectangle"), pricingMode: "custom" } }] };
-    const cropQuote = await (await api("/api/sepet/fiyat", cropQuoteRequest)).json();
-    check(cropQuote.quotes[0].price === 3880, "New cropped product works in server-validated builder pricing");
-    check((await api("/api/admin/products", { id: cropId, version: 1, data: { ...cropProduct, builderParts: { ...savedCrop.parts, enabled: false } } })).status === 200, "Seller can remove cropped parts from builder without deleting product");
-    const disabledCropQuote = await (await api("/api/sepet/fiyat", cropQuoteRequest)).json();
-    check(disabledCropQuote.quotes[0].price === null, "Disabled cropped sources immediately invalidate quotes");
-    check((await api("/api/admin/products", { id: cropId, version: 2 }, "DELETE")).status === 200, "Crop test product can be deleted normally");
+    check(
+      cropHome.includes(savedCrop.parts.left),
+      "Storefront immediately receives newly saved custom parts",
+    );
+    const cropQuoteRequest = {
+      items: [
+        {
+          slug: "ozel-set",
+          quantity: 1,
+          configuration: {
+            source: "builder",
+            kind: "set",
+            left: cropRow.code,
+            right: cropRow.code,
+            clock: cropRow.code,
+            numeral: "original",
+            dimensions: defaultDimensions(pricing, "rectangle"),
+            pricingMode: "custom",
+          },
+        },
+      ],
+    };
+    const cropQuote = await (
+      await api("/api/sepet/fiyat", cropQuoteRequest)
+    ).json();
+    check(
+      cropQuote.quotes[0].price === 3880,
+      "New cropped product works in server-validated builder pricing",
+    );
+    check(
+      (
+        await api("/api/admin/products", {
+          id: cropId,
+          version: 1,
+          data: {
+            ...cropProduct,
+            builderParts: { ...savedCrop.parts, enabled: false },
+          },
+        })
+      ).status === 200,
+      "Seller can remove cropped parts from builder without deleting product",
+    );
+    const disabledCropQuote = await (
+      await api("/api/sepet/fiyat", cropQuoteRequest)
+    ).json();
+    check(
+      disabledCropQuote.quotes[0].price === null,
+      "Disabled cropped sources immediately invalidate quotes",
+    );
+    check(
+      (await api("/api/admin/products", { id: cropId, version: 2 }, "DELETE"))
+        .status === 200,
+      "Crop test product can be deleted normally",
+    );
     check(
       (await api("/api/admin/trendyol")).status === 503,
       "Missing Trendyol credentials fail explicitly",
@@ -580,7 +862,10 @@ async function main() {
       (await api("/api/siparis-talebi", {})).status === 410,
       "Removed inquiry endpoint is closed",
     );
-    check((await api("/api/admin/crop", crop)).status === 401, "Crop requires an authenticated administrator");
+    check(
+      (await api("/api/admin/crop", crop)).status === 401,
+      "Crop requires an authenticated administrator",
+    );
     check(
       (await pg.query("SELECT id FROM woya_orders")).rows.length === 0,
       "Removed inquiry endpoint creates no order",
@@ -668,12 +953,15 @@ async function main() {
     );
     const home = await (await fetch(base)).text();
     check(
-      (home.match(/class="hero-slide-image"/g) ?? []).length === Math.min(2, initialContent.heroImages.length),
+      (home.match(/class="hero-slide-image"/g) ?? []).length ===
+        Math.min(2, initialContent.heroImages.length),
       "Hero initially renders only the active and next images",
     );
     check(
       home.includes('class="showcase-products"') &&
-        home.includes('<span>FA</span><span>VO</span><span>Rİ</span><span>LER</span>'),
+        home.includes(
+          "<span>FA</span><span>VO</span><span>Rİ</span><span>LER</span>",
+        ),
       "Favorites retain segmented lettering and a separate mobile product rail",
     );
     check(

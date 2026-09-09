@@ -22,7 +22,19 @@ export type CustomerOrder = Pick<
   id: string;
   created_at: string;
   linked: boolean;
-  billing: { name: string; address: string } | null;
+  billing: Order["billing"];
   shipment: { carrier: string; trackingNumber: string } | null;
   requests: ServiceRequest[];
+  documents?: { id: string; created_at: string }[];
+  refunds?: {
+    amount: number;
+    provider_reference: string;
+    performed_at: string;
+    reason: string;
+  }[];
+  legal_snapshot?: {
+    version: string;
+    acceptedAt: string;
+    store: import("../commerce/schema").StoreSettings;
+  } | null;
 };

@@ -125,6 +125,12 @@ export function OrderView({
               <dd>{money(order.payment.shipping)}</dd>
               <dt>Toplam</dt>
               <dd>{money(order.payment.amount)}</dd>
+              {order.payment.receivedAmount !== undefined && (
+                <>
+                  <dt>Tahsil edilen toplam</dt>
+                  <dd>{money(order.payment.receivedAmount)}</dd>
+                </>
+              )}
             </dl>
           )}
         </section>
@@ -142,14 +148,45 @@ export function OrderView({
             <dt>Fatura</dt>
             <dd>
               {order.billing
-                ? `${order.billing.name}\n${order.billing.address}`
+                ? `${order.billing.companyName || order.billing.name}\n${order.billing.address}${order.billing.taxNumber ? `\n${order.billing.taxOffice} · ${order.billing.taxNumber}` : ""}`
                 : "Eski kayıtta ayrı fatura adresi yok."}
             </dd>
           </dl>
-          <p className={styles.hint}>
-            Fatura belgesi henüz sistemde bulunmuyor. Belge için siparişe destek
-            mesajı ekleyebilirsiniz.
-          </p>
+          {order.documents?.length ? (
+            order.documents.map((d) => (
+              <p key={d.id}>
+                <a href={`/api/belgeler/${d.id}`}>
+                  PDF faturayı indir · {date(d.created_at)}
+                </a>
+              </p>
+            ))
+          ) : (
+            <p className={styles.hint}>
+              Fatura hazır olduğunda burada görünecek.
+            </p>
+          )}
+          {order.refunds?.map((r, i) => (
+            <p key={i}>
+              Para iadesi: {money(Number(r.amount))} · {r.provider_reference} ·{" "}
+              {date(r.performed_at)}
+            </p>
+          ))}
+          {order.legal_snapshot ? (
+            <details>
+              <summary>Sipariş anındaki sözleşmeler</summary>
+              <p>
+                Sürüm: {order.legal_snapshot.version} · Onay:{" "}
+                {date(order.legal_snapshot.acceptedAt)}
+              </p>
+              {["informationText", "termsText", "privacyText"].map((k) => (
+                <p style={{ whiteSpace: "pre-wrap" }} key={k}>
+                  {order.legal_snapshot!.store[k as "termsText"]}
+                </p>
+              ))}
+            </details>
+          ) : (
+            <p>Bu eski siparişte saklanmış sözleşme bulunmuyor.</p>
+          )}
           {order.note && <p>Sipariş notu: {order.note}</p>}
         </section>
         <section className={styles.panel}>

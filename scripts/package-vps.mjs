@@ -135,6 +135,16 @@ async function main() {
   ].join("\n");
   await writeFile(path.join(stageDir, "VPS_README.txt"), manifest);
 
+  copyDirectory(path.join(root, "db"), path.join(stageDir, "db"));
+  const revision =
+    process.env.GITHUB_SHA ||
+    execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+  if (!/^[a-f0-9]{40}$/.test(revision))
+    throw new Error("Invalid release revision");
+  await writeFile(path.join(stageDir, "REVISION"), revision + "\n");
   const forbidden = await forbiddenEntries();
   if (forbidden.length) {
     throw new Error(

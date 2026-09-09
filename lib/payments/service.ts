@@ -16,6 +16,8 @@ import type {
   PaymentState,
 } from "./schema";
 
+import { enqueueOrderEmail } from "../commerce/outbox";
+
 const paymentUrl = (oid: string) => `/odeme/islem/${oid}`;
 export async function startPayment(input: CheckoutInput, request: Request) {
   const config = paymentConfig();
@@ -69,9 +71,9 @@ export async function startPayment(input: CheckoutInput, request: Request) {
       shipping: quote.shipping,
       testMode: config.testMode,
     };
-    await tx`INSERT INTO woya_orders(id,request_id,reference,customer,items,note,payment,history,customer_id,billing)
+    await tx`INSERT INTO woya_orders(id,request_id,reference,customer,items,note,payment,history,customer_id,billing,legal_snapshot)
       VALUES(${id},${input.requestId},${oid},${tx.json(input.customer)},${tx.json(quote.items)},${input.note},${tx.json(summary)},
-      ${tx.json([{ status: "Ödeme bekleniyor", at: new Date().toISOString() }])},${account?.customer.id ?? null},${tx.json(input.billing ?? { name: input.customer.name, address: input.customer.address })})`;
+      ${tx.json([{ status: "Ödeme bekleniyor", at: new Date().toISOString() }])},${account?.customer.id ?? null},${tx.json(input.billing ?? { name: input.customer.name, address: input.customer.address })},${tx.json({ version: quote.store.legalVersion, acceptedAt: new Date().toISOString(), store: quote.store, items: quote.items, subtotal: quote.subtotal, shipping: quote.shipping, total: quote.total })})`;
     await tx`INSERT INTO woya_payments(merchant_oid,order_id,request_id,owner_hash,input_hash,amount,test_mode,state,consent_version)
       VALUES(${oid},${id},${input.requestId},${owner},${inputHash},${quote.total},${config.testMode},'creating',${config.legalVersion || "test-only"})`;
     return { fresh: true as const, oid, quote };
@@ -94,7 +96,7 @@ export async function startPayment(input: CheckoutInput, request: Request) {
     email: input.customer.email,
     payment_amount: String(quote.total),
     user_basket: Buffer.from(JSON.stringify(basket), "utf8").toString("base64"),
-    no_installment: "1",
+    no_installment: "0",
     max_installment: "0",
     currency: "TL",
     test_mode: config.testMode ? "1" : "0",
@@ -214,7 +216,7 @@ export async function handleCallback(raw: unknown) {
     const testMode = Boolean(row.test_mode) || fields.test_mode === "1";
     const receivedAmount = Number(fields.total_amount);
     const matches =
-      receivedAmount === row.amount &&
+      receivedAmount >= row.amount &&
       Number(fields.payment_amount) === row.amount &&
       fields.currency === "TL" &&
       fields.payment_type === "card" &&
@@ -239,6 +241,23 @@ export async function handleCallback(raw: unknown) {
     await tx`UPDATE woya_payments SET state=${state},test_mode=${testMode},received_amount=${receivedAmount},callback_hash=${fields.hash},iframe_token=NULL WHERE merchant_oid=${fields.merchant_oid}`;
     await tx`UPDATE woya_orders SET payment=payment || ${tx.json(summary)}::jsonb,status=${status},version=version+1,
       history=history || ${tx.json([{ status: `PayTR: ${testMode ? "test / " : ""}${state}`, at: new Date().toISOString() }])}::jsonb WHERE id=${row.order_id}`;
+    if (state === "paid" && !testMode) {
+      await enqueueOrderEmail(
+        tx,
+        row.order_id,
+        `paid:${row.order_id}:customer`,
+        "Ödemeniz alındı",
+        `Sipariş tutarı: ${(row.amount / 100).toFixed(2)} TL. Tahsil edilen toplam: ${(receivedAmount / 100).toFixed(2)} TL.`,
+      );
+      await enqueueOrderEmail(
+        tx,
+        row.order_id,
+        `paid:${row.order_id}:merchant`,
+        "Yeni ödenmiş sipariş",
+        "Ödeme PayTR bildirimiyle doğrulandı.",
+        true,
+      );
+    }
     if (state === "paid" && !testMode && order.customer_id) {
       const [cart] =
         await tx`SELECT items FROM woya_customer_carts WHERE customer_id=${order.customer_id} FOR UPDATE`;

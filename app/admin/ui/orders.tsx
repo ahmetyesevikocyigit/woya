@@ -1,4 +1,5 @@
 "use client";
+import { OrderCommerce } from "./commerce";
 import { CustomerService } from "./customer-service";
 import { useState } from "react";
 import Link from "next/link";
@@ -260,7 +261,12 @@ export function OrderDetail({ order }: { order: Order }) {
             <>
               <h2>Fatura Adresi</h2>
               <p className="admin-pre">
-                {order.billing.name}
+                {order.billing.companyName || order.billing.name}
+                {order.billing.taxNumber && (
+                  <small>
+                    {order.billing.taxOffice} · {order.billing.taxNumber}
+                  </small>
+                )}
                 <br />
                 {order.billing.address}
               </p>
@@ -327,6 +333,20 @@ export function OrderDetail({ order }: { order: Order }) {
           </form>
         </aside>
       </div>
+      {order.legalSnapshot && (
+        <details>
+          <summary>
+            Sipariş anındaki sözleşmeler · {order.legalSnapshot.version}
+          </summary>
+          <p>Onay: {date(order.legalSnapshot.acceptedAt)}</p>
+          {["informationText", "termsText", "privacyText"].map((k) => (
+            <p className="admin-pre" key={k}>
+              {order.legalSnapshot!.store[k as "termsText"]}
+            </p>
+          ))}
+        </details>
+      )}
+      <OrderCommerce orderId={order.id} />
       <CustomerService orderId={order.id} />
     </>
   );

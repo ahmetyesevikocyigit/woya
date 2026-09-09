@@ -1,3 +1,4 @@
+import { storeSettings } from "@/lib/commerce/settings";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -79,11 +80,20 @@ export function InstagramMark() {
   );
 }
 
-export function TopAnnouncement() {
+export async function TopAnnouncement() {
+  const { data: s } = await storeSettings();
   return (
     <div className="top-announcement" aria-label="WOYA bilgilendirme şeridi">
-      <span>Hızlı teslimat</span>
-      <strong>2000 TL üzeri ücretsiz kargo</strong>
+      <span>
+        {s.productionDays !== null
+          ? `${s.productionDays} iş gününde üretim`
+          : "Özenle hazırlanır"}
+      </span>
+      <strong>
+        {s.freeShippingThreshold !== null && s.shippingFee !== null
+          ? `${(s.freeShippingThreshold / 100).toLocaleString("tr-TR")} TL ve üzeri ücretsiz kargo`
+          : "Güvenli paketleme"}
+      </strong>
       <span>Güvenli ödeme</span>
     </div>
   );
