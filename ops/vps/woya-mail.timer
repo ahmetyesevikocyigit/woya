@@ -1,0 +1,8 @@
+[Unit]
+Description=Process WOYA transactional emails
+[Timer]
+OnBootSec=90
+OnUnitInactiveSec=60
+Unit=woya-mail.service
+[Install]
+WantedBy=timers.target

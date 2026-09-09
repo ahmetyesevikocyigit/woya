@@ -1,0 +1,140 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { PGlite } from "@electric-sql/pglite";
+import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
+import { readFile } from "node:fs/promises";
+import { createServer } from "node:net";
+import { once } from "node:events";
+import { randomUUID } from "node:crypto";
+import {
+  storeSettingsSchema,
+  configuredShipping,
+  missingStoreSettings,
+} from "../lib/commerce/schema";
+import { checkoutBillingSchema } from "../lib/customer/schema";
+test("Shipping and corporate billing fail closed without fabricated values", () => {
+  const s = storeSettingsSchema.parse({});
+  assert.equal(configuredShipping(999999, s), null);
+  assert.ok(missingStoreSettings(s).includes("sellerName"));
+  assert.equal(
+    configuredShipping(200000, {
+      ...s,
+      shippingFee: 10000,
+      freeShippingThreshold: 200000,
+    }),
+    0,
+  );
+  assert.equal(
+    configuredShipping(199999, {
+      ...s,
+      shippingFee: 10000,
+      freeShippingThreshold: 200000,
+    }),
+    10000,
+  );
+  assert.equal(
+    checkoutBillingSchema.safeParse({
+      type: "company",
+      name: "Test Buyer",
+      address: "Test Street No 123 Istanbul",
+    }).success,
+    false,
+  );
+});
+test("Outbox survives transport failure, provider ambiguity and a worker crash without changing payload/key", async () => {
+  const net = createServer().listen(0, "127.0.0.1");
+  await once(net, "listening");
+  const port = (net.address() as { port: number }).port;
+  await new Promise<void>((r) => net.close(() => r()));
+  const pg = new PGlite();
+  const socket = new PGLiteSocketServer({
+    db: pg,
+    port,
+    host: "127.0.0.1",
+    maxConnections: 4,
+  });
+  const original = globalThis.fetch;
+  let calls = 0;
+  const seen: string[] = [];
+  let mode = "fail";
+  process.env.DATABASE_URL = `postgres://postgres:postgres@127.0.0.1:${port}/postgres`;
+  process.env.CUSTOMER_EMAIL_API_KEY = "test-only";
+  const { db } = await import("../lib/admin/db");
+  const { deliverOne } = await import("../lib/commerce/worker");
+  try {
+    for (const f of [
+      "001-admin.sql",
+      "002-admin-security.sql",
+      "003-paytr.sql",
+      "004-customer-accounts.sql",
+      "005-commerce.sql",
+    ])
+      await pg.exec(await readFile(`db/${f}`, "utf8"));
+    await pg.exec(await readFile("db/005-commerce.sql", "utf8"));
+    await socket.start();
+    const id = randomUUID();
+    const key = `test:${id}`;
+    const payload = {
+      from: "WOYA <test@example.test>",
+      to: ["test@example.test"],
+      subject: "test",
+      text: "immutable body",
+    };
+    await pg.query(
+      "INSERT INTO woya_email_outbox(id,event_key,payload) VALUES($1,$2,$3)",
+      [id, key, JSON.stringify(payload)],
+    );
+    globalThis.fetch = async (input, init) => {
+      assert.equal(input, "https://api.resend.com/emails");
+      calls++;
+      seen.push(String(init?.body));
+      assert.equal(
+        (init?.headers as Record<string, string>)["Idempotency-Key"],
+        key,
+      );
+      if (mode === "fail") throw new Error("timeout");
+      return Response.json({ id: "provider-test" });
+    };
+    assert.equal(await deliverOne(), true);
+    assert.equal(
+      (await pg.query<{ state: string }>("SELECT state FROM woya_email_outbox"))
+        .rows[0].state,
+      "retry",
+    );
+    await pg.exec(
+      "UPDATE woya_email_outbox SET next_attempt_at=now()-interval '1 minute'",
+    );
+    mode = "ok";
+    await pg.query(
+      "INSERT INTO woya_email_events(id,provider_id,kind,occurred_at) VALUES('event1','provider-test','email.delivered',now())",
+    );
+    assert.equal(await deliverOne(), true);
+    assert.equal(
+      (await pg.query<{ state: string }>("SELECT state FROM woya_email_outbox"))
+        .rows[0].state,
+      "delivered",
+    );
+    assert.equal(seen[0], seen[1]);
+    assert.equal(await deliverOne(), false);
+    assert.equal(calls, 2);
+    await assert.rejects(pg.exec("UPDATE woya_email_outbox SET payload='{}'"));
+    await pg.exec(
+      "UPDATE woya_email_outbox SET state='sending',first_attempt_at=now()-interval '25 hours',lease_until=now()-interval '1 minute'",
+    );
+    await deliverOne();
+    assert.equal(
+      (await pg.query<{ state: string }>("SELECT state FROM woya_email_outbox"))
+        .rows[0].state,
+      "unknown",
+    );
+    assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = original;
+    await db().end();
+    delete (globalThis as { woyaSql?: unknown }).woyaSql;
+    await socket.stop();
+    await pg.close();
+    delete process.env.DATABASE_URL;
+    delete process.env.CUSTOMER_EMAIL_API_KEY;
+  }
+});

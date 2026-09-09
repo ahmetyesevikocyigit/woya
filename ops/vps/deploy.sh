@@ -28,30 +28,30 @@ on_error() {
   echo "WOYA deployment failed: $sha; inspect journalctl -u woya-deploy"
 }
 trap on_error ERR
-install -d -o woya -g woya -m 0750 "$release"
+archive=/var/lib/woya-incoming/$sha.tar.gz
 if [[ ! -f "$release/.verified" ]]; then
-  runuser -u woya -- git -C "$source_dir" archive "$sha" | runuser -u woya -- tar -x -C "$release"
-  systemd-run --quiet --wait --collect --unit="woya-build-${sha:0:12}" \
-    --uid=woya --property="WorkingDirectory=$release" \
-    --property=MemoryMax=1600M --property=CPUQuota=100% --property=Nice=10 \
-    /usr/local/lib/woya/build.sh
+  test -f "$archive" || exit 0
+  install -d -o woya -g woya -m 0750 "$release"
+  install -o woya -g woya -m 0400 "$archive" /var/lib/woya/release-input.tar.gz
+  runuser -u woya -- /usr/local/lib/woya/extract-release.py /var/lib/woya/release-input.tar.gz "$release"
+  [[ $(cat "$release/REVISION") == "$sha" ]]
+  test -f "$release/server.js"
+  touch "$release/.verified"
+  rm -f /var/lib/woya/release-input.tar.gz
 fi
 # Database schema changes require a reviewed migration before traffic is switched.
-if [[ -n "$previous" && -d "$previous/db" ]]; then
-  if ! diff -qr "$previous/db" "$release/db"; then
-    # Only a reviewed, already applied schema is allowed across this gate.
-    actual=$(cd "$release" && find db -type f -print0 | sort -z | xargs -0 sha256sum)
-    expected=$(cat /etc/woya/approved-db.sha256)
-    [[ "$actual" == "$expected" ]]
-  fi
-fi
+test -d "$release/db"
+actual=$(cd "$release" && find db -type f -print0 | sort -z | xargs -0 sha256sum)
+expected=$(cat /etc/woya/approved-db.sha256)
+[[ "$actual" == "$expected" ]]
 test -r /etc/woya/runtime.json
 ln -sfn "$release" /var/www/woya-candidate
 systemctl restart woya-stage.service
 healthy() {
   local port=$1
   for attempt in $(seq 1 45); do
-    if curl -fsS --max-time 15 "http://127.0.0.1:$port/" -o /dev/null && \
+    if curl -fsS --max-time 15 "http://127.0.0.1:$port/api/health" -o /dev/null && \
+       curl -fsS --max-time 15 "http://127.0.0.1:$port/" -o /dev/null && \
        curl -fsS --max-time 15 "http://127.0.0.1:$port/urunler" -o /dev/null && \
        curl -fsS --max-time 15 "http://127.0.0.1:$port/admin/giris" -o /dev/null; then
       return 0
@@ -73,6 +73,7 @@ fi
 runuser -u woya -- git -C "$source_dir" reset --hard "$sha"
 echo "$sha" > /var/lib/woya/deployed-sha
 rm -f /var/lib/woya/failed-sha
+rm -f "$archive"
 echo "WOYA deployed successfully: $sha"
 # Retain the newest three releases, plus current and rollback targets.
 find /var/www/woya-releases -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | tail -n +4 | cut -d' ' -f2- | while read -r old; do

@@ -25,4 +25,16 @@ export type CustomerOrder = Pick<
   billing: { name: string; address: string } | null;
   shipment: { carrier: string; trackingNumber: string } | null;
   requests: ServiceRequest[];
+  documents?: { id: string; created_at: string }[];
+  refunds?: {
+    amount: number;
+    provider_reference: string;
+    performed_at: string;
+    reason: string;
+  }[];
+  legal_snapshot?: {
+    version: string;
+    acceptedAt: string;
+    store: import("../commerce/schema").StoreSettings;
+  } | null;
 };

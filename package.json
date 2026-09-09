@@ -26,7 +26,9 @@
     "product:test:add": "tsx scripts/test-product.ts",
     "product:test:remove": "tsx scripts/test-product.ts --remove",
     "catalog:prices": "tsx scripts/catalog-prices.ts",
-    "catalog:prices:overwrite": "tsx scripts/catalog-prices.ts --overwrite"
+    "catalog:prices:overwrite": "tsx scripts/catalog-prices.ts --overwrite",
+    "test:commerce": "tsx --conditions=react-server --test tests/commerce-worker.test.ts",
+    "commerce:migrate": "tsx scripts/commerce-migrate.ts"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",
@@ -39,6 +41,7 @@
     "react-dom": "latest",
     "server-only": "^0.0.1",
     "sharp": "latest",
+    "svix": "^2.3.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {

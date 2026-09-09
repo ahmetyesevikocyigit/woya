@@ -72,6 +72,7 @@ async function main() {
   const key = randomBytes(24).toString("hex");
   const salt = randomBytes(24).toString("hex");
   const emailKey = randomBytes(24).toString("hex");
+  const webhookKey = randomBytes(32);
   type Jar = Map<string, string>;
   const jar = () => new Map<string, string>();
   const a = jar(),
@@ -138,6 +139,7 @@ async function main() {
       "002-admin-security.sql",
       "003-paytr.sql",
       "004-customer-accounts.sql",
+      "005-commerce.sql",
     ])
       await pg.query(await readFile(`db/${f}`, "utf8"));
     const oldId = randomUUID(),
@@ -168,6 +170,9 @@ async function main() {
       ],
     );
     await pg.query(await readFile("db/004-customer-accounts.sql", "utf8"));
+    await pg.query(
+      'UPDATE woya_store_settings SET data=\'{"shippingFee":10000,"freeShippingThreshold":200000,"productionDays":3,"deliveryDays":2,"replyTo":"support@example.test","notificationEmail":"merchant@example.test"}\'::jsonb',
+    );
     check(
       (await count("woya_orders")) === 1,
       "Migration reruns without altering legacy orders",
@@ -220,11 +225,13 @@ async function main() {
           ADMIN_SESSION_SECRET: randomBytes(32).toString("hex"),
           CUSTOMER_AUTH_SECRET: randomBytes(32).toString("hex"),
           CUSTOMER_EMAIL_API_KEY: emailKey,
+          RESEND_WEBHOOK_SECRET: "whsec_" + webhookKey.toString("base64"),
           CUSTOMER_EMAIL_FROM: "WOYA Test <sender@example.test>",
           CUSTOMER_TRUSTED_IP_HEADER: "",
           WOYA_TEST_EMAIL_SINK: `http://127.0.0.1:${(sink.address() as { port: number }).port}`,
           VERCEL: "",
           STORAGE_DRIVER: "local",
+          PRIVATE_DOCUMENT_DIR: resolve(databaseDir, "private-documents"),
           PAYTR_ENABLED: "true",
           PAYTR_TEST_MODE: "1",
           PAYTR_MERCHANT_ID: "100001",
@@ -852,6 +859,179 @@ async function main() {
         [liveRef],
       )
     ).rows[0];
+    const pdf = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF");
+    async function invoiceUpload(j: Jar, bytes = pdf, origin = base) {
+      return fetch(
+        `${base}/api/admin/commerce?action=invoice&orderId=${liveOrder.id}`,
+        {
+          method: "POST",
+          headers: {
+            Origin: origin,
+            Cookie: [...j].map(([k, v]) => `${k}=${v}`).join("; "),
+            "Content-Type": "application/pdf",
+          },
+          body: bytes,
+        },
+      );
+    }
+    check(
+      (await invoiceUpload(a)).status === 401,
+      "Customers cannot upload an invoice",
+    );
+    check(
+      (await invoiceUpload(admin, pdf, "https://evil.test")).status === 403,
+      "Invoice writes enforce Origin",
+    );
+    check(
+      (await invoiceUpload(admin, Buffer.from("not a pdf"))).status === 400,
+      "Invalid invoice payload rejected",
+    );
+    const invoice = await (await invoiceUpload(admin)).json();
+    check(
+      Boolean(invoice.id) &&
+        (await invoiceUpload(admin)).status === 200 &&
+        (await count("woya_private_documents")) === 1,
+      "Repeated PDF upload stores one invoice and notification",
+    );
+    async function download(j: Jar, id = invoice.id) {
+      return fetch(`${base}/api/belgeler/${id}`, {
+        headers: { Cookie: [...j].map(([k, v]) => `${k}=${v}`).join("; ") },
+      });
+    }
+    check(
+      (await download(admin)).status === 200 &&
+        (await download(a)).status === 200,
+      "Administrator and order owner can download invoice",
+    );
+    check(
+      (await download(b)).status === 404 &&
+        (await download(jar())).status === 401,
+      "Other customers and anonymous visitors cannot download invoice",
+    );
+    const ownInvoice = await download(a);
+    check(
+      ownInvoice.headers.get("cache-control") === "private, no-store" &&
+        ownInvoice.headers.get("content-disposition")?.startsWith("attachment"),
+      "Invoice delivery is private, uncached and attachment-only",
+    );
+    const refund = {
+      orderId: liveOrder.id,
+      submissionId: randomUUID(),
+      amount: 1000,
+      providerReference: "TEST-REFUND-1",
+      reason: "Test refund completed outside site",
+      performedAt: new Date().toISOString(),
+      confirmed: true,
+    };
+    check(
+      (await api("commerce?action=refund", refund, a, base, "/api/admin/"))
+        .status === 401,
+      "Only administrator can record refunds",
+    );
+    await good("commerce?action=refund", refund, admin, "/api/admin/");
+    await good("commerce?action=refund", refund, admin, "/api/admin/");
+    check(
+      (await count("woya_refunds")) === 1,
+      "Refund replay records one confirmed refund",
+    );
+    check(
+      (
+        await api(
+          "commerce?action=refund",
+          { ...refund, amount: 2000 },
+          admin,
+          base,
+          "/api/admin/",
+        )
+      ).status === 409,
+      "Refund replay with changed amount rejected",
+    );
+    check(
+      (
+        await api(
+          "commerce?action=refund",
+          {
+            ...refund,
+            submissionId: randomUUID(),
+            providerReference: "TEST-REFUND-2",
+            amount: liveQuote.quote.total,
+          },
+          admin,
+          base,
+          "/api/admin/",
+        )
+      ).status === 409,
+      "Cumulative refund cannot exceed captured total",
+    );
+    const commerceOrder = await good(`order?reference=${liveRef}`);
+    check(
+      commerceOrder.documents.length === 1 &&
+        commerceOrder.refunds.length === 1 &&
+        commerceOrder.legal_snapshot !== null,
+      "Owner sees private invoice, refund result and immutable contract snapshot",
+    );
+    let legalImmutable = false;
+    try {
+      await pg.query("UPDATE woya_orders SET legal_snapshot='{}' WHERE id=$1", [
+        liveOrder.id,
+      ]);
+    } catch {
+      legalImmutable = true;
+    }
+    check(legalImmutable, "Stored legal documents cannot be rewritten");
+    const mailRow = (
+      await pg.query<{ id: string }>(
+        "SELECT id FROM woya_email_outbox WHERE order_id=$1 LIMIT 1",
+        [liveOrder.id],
+      )
+    ).rows[0];
+    await pg.query(
+      "UPDATE woya_email_outbox SET state='sent',provider_id='signed-provider-test' WHERE id=$1",
+      [mailRow.id],
+    );
+    const hookBody = JSON.stringify({
+      type: "email.delivered",
+      created_at: new Date().toISOString(),
+      data: { email_id: "signed-provider-test" },
+    });
+    const hookTime = String(Math.floor(Date.now() / 1000)),
+      hookId = "test-webhook-id";
+    const hookSig =
+      "v1," +
+      createHmac("sha256", webhookKey)
+        .update(`${hookId}.${hookTime}.${hookBody}`)
+        .digest("base64");
+    async function webhook(signature = hookSig) {
+      return fetch(base + "/api/resend/bildirim", {
+        method: "POST",
+        headers: {
+          "svix-id": hookId,
+          "svix-timestamp": hookTime,
+          "svix-signature": signature,
+        },
+        body: hookBody,
+      });
+    }
+    check(
+      (await webhook("v1,forged")).status === 400,
+      "Forged Resend delivery callback rejected",
+    );
+    const signedHook = await webhook();
+    const signedHookText = await signedHook.text();
+    check(
+      signedHook.status === 200 && (await webhook()).status === 200,
+      `Signed delivery callback accepts safe replay: ${signedHook.status} ${signedHookText}`,
+    );
+    check(
+      (
+        await pg.query<{ state: string }>(
+          "SELECT state FROM woya_email_outbox WHERE id=$1",
+          [mailRow.id],
+        )
+      ).rows[0].state === "delivered" &&
+        (await count("woya_email_events")) === 1,
+      "Delivery events are deduplicated and update the correct notification",
+    );
     const cancelRequest = await good("request", {
       reference: liveRef,
       requestId: randomUUID(),
@@ -1201,5 +1381,5 @@ async function main() {
 }
 main().catch((e) => {
   console.error(e instanceof Error ? e.message : "Customer tests failed");
-  process.exitCode = 1;
+  process.exit(1);
 });

@@ -24,6 +24,7 @@ async function main() {
       await tx.unsafe(await readFile("db/002-admin-security.sql", "utf8"));
       await tx.unsafe(await readFile("db/003-paytr.sql", "utf8"));
       await tx.unsafe(await readFile("db/004-customer-accounts.sql", "utf8"));
+      await tx.unsafe(await readFile("db/005-commerce.sql", "utf8"));
       const credentials =
         await tx`SELECT identity FROM woya_admin_credentials WHERE identity='woya-admin'`;
       if (!credentials.length) {

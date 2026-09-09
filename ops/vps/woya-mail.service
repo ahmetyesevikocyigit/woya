@@ -1,0 +1,14 @@
+[Unit]
+Description=WOYA transactional mail queue
+After=woya.service
+[Service]
+Type=oneshot
+User=woya
+Group=woya
+LoadCredential=runtime:/etc/woya/runtime.json
+ExecStart=/usr/bin/node /usr/local/lib/woya/run.mjs /usr/local/lib/woya/mail-worker.mjs
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+TimeoutStartSec=45

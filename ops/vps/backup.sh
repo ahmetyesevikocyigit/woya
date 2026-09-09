@@ -9,6 +9,9 @@ target=/var/backups/woya/$stamp
 mkdir "$target"
 runuser -u postgres -- pg_dump --format=custom --dbname=woya > "$target/database.dump"
 tar -czf "$target/uploads.tar.gz" -C /var/lib/woya uploads
+if [[ -d /var/lib/woya/private-documents ]]; then
+  tar -czf "$target/private-documents.tar.gz" -C /var/lib/woya private-documents
+fi
 test -s "$target/database.dump"
 runuser -u postgres -- pg_restore --list < "$target/database.dump" > /dev/null
 touch "$target/complete"

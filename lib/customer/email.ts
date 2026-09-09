@@ -1,4 +1,6 @@
 import "server-only";
+import { databaseConfigured } from "../admin/db";
+import { storeSettings } from "../commerce/settings";
 import { HttpError } from "../http-error";
 export function emailConfiguration() {
   const key = process.env.CUSTOMER_EMAIL_API_KEY;
@@ -28,6 +30,9 @@ export async function sendAccountEmail(
   purpose: "verify" | "reset" | "email" | "guest",
 ) {
   const { key, from, origin } = emailConfiguration();
+  const replyTo = databaseConfigured()
+    ? (await storeSettings()).data.replyTo
+    : "";
   const pages = {
     verify: "dogrula",
     reset: "sifre-sifirla",
@@ -51,6 +56,7 @@ export async function sendAccountEmail(
       },
       body: JSON.stringify({
         from,
+        ...(replyTo ? { reply_to: replyTo } : {}),
         to: [to],
         subject: `WOYA · ${subjects[purpose]}`,
         text: `${subjects[purpose]}\n\n${link}\n\nBu bağlantı 30 dakika geçerlidir ve bir kez kullanılabilir. İşlemi siz başlatmadıysanız bu e-postayı dikkate almayın.`,

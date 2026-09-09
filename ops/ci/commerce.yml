@@ -1,0 +1,84 @@
+name: WOYA verified release
+on:
+  push:
+    branches: [main, feat/commerce-completion]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: woya-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_SITE_URL: https://woyatablo.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: corepack enable && corepack prepare pnpm@11.19.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: python3 tests/deploy-archive.test.py
+      - run: pnpm typecheck
+      - run: |
+          pnpm test:admin
+          pnpm test:pricing
+          pnpm test:artwork
+          pnpm test:crop
+          pnpm test:payments
+          pnpm test:legal
+          pnpm test:customer
+          pnpm test:customer:email
+          pnpm test:commerce
+      - run: pnpm build --webpack
+      - run: pnpm test:admin:http && pnpm test:payments:http
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:customer:browser
+      - run: node scripts/package-vps.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: woya-${{ github.sha }}
+          path: |
+            dist/woya-vps-standalone.tar.gz
+            dist/woya-vps-standalone.tar.gz.sha256
+          retention-days: 14
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: woya-${{ github.sha }}
+          path: release
+      - name: Send verified package to WOYA-only receiver
+        env:
+          WOYA_DEPLOY_KEY: ${{ secrets.WOYA_DEPLOY_KEY }}
+          WOYA_HOST_KEY: ${{ secrets.WOYA_HOST_KEY }}
+          WOYA_HOST: ${{ vars.WOYA_HOST }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$WOYA_DEPLOY_KEY" > ~/.ssh/woya_deploy
+          printf '%s\n' "$WOYA_HOST_KEY" > ~/.ssh/known_hosts
+          cd release
+          sha256sum -c woya-vps-standalone.tar.gz.sha256
+          digest=$(sha256sum woya-vps-standalone.tar.gz | cut -d' ' -f1)
+          ssh -i ~/.ssh/woya_deploy -o BatchMode=yes -o StrictHostKeyChecking=yes "woya-deploy@$WOYA_HOST" "release $GITHUB_SHA $digest" < woya-vps-standalone.tar.gz
+          for attempt in $(seq 1 45); do
+            live=$(curl -fsS --max-time 10 "https://woyatablo.com/api/health?release=$GITHUB_SHA" || true)
+            if [[ "$live" == *"$GITHUB_SHA"* ]]; then exit 0; fi
+            sleep 5
+          done
+          echo 'Release uploaded but production health did not confirm activation.'
+          exit 1

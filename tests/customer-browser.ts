@@ -1,9 +1,6 @@
 import { chromium, expect } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { defaultDimensions, initialPricing } from "../lib/pricing";
-const exec = promisify(execFile);
 export async function verifyBrowser({
   base,
   password,
@@ -20,46 +17,6 @@ export async function verifyBrowser({
   resetLimits: () => Promise<void>;
 }) {
   await mkdir("work/customer-qa", { recursive: true });
-  // Skill's quick visual smoke check, isolated from the user's browser sessions.
-  try {
-    await exec("pnpm", [
-      "dlx",
-      "agent-browser",
-      "--session",
-      "woya-accounts",
-      "open",
-      base + "/profil",
-    ]);
-    const { stdout } = await exec("pnpm", [
-      "dlx",
-      "agent-browser",
-      "--session",
-      "woya-accounts",
-      "snapshot",
-      "-i",
-    ]);
-    if (!stdout.includes("Giriş yap"))
-      throw new Error("Account page has no login form");
-    await exec("pnpm", [
-      "dlx",
-      "agent-browser",
-      "--session",
-      "woya-accounts",
-      "screenshot",
-      "work/customer-qa/agent-browser-login.png",
-    ]);
-    console.log(
-      "PASS browser: agent-browser page load, interactive login form and screenshot",
-    );
-  } finally {
-    await exec("pnpm", [
-      "dlx",
-      "agent-browser",
-      "--session",
-      "woya-accounts",
-      "close",
-    ]).catch(() => {});
-  }
   const browser = await chromium.launch({ headless: true });
   let diagnosticPage: import("@playwright/test").Page | undefined;
   try {
@@ -146,6 +103,16 @@ export async function verifyBrowser({
     console.log(
       "PASS browser: address management and independently editable checkout billing/delivery",
     );
+    await page
+      .getByLabel("Fatura türü", { exact: true })
+      .selectOption("company");
+    await page
+      .getByLabel("Şirket unvanı", { exact: true })
+      .fill("Örnek Test Ltd Şti");
+    await page
+      .getByLabel("Vergi dairesi", { exact: true })
+      .fill("Test Vergi Dairesi");
+    await page.getByLabel("Vergi numarası", { exact: true }).fill("1234567890");
     await page.locator('input[name="consent"]').check();
     await page.locator('button[type="submit"]').click();
     await page.waitForURL("**/odeme/islem/*");
@@ -240,6 +207,80 @@ export async function verifyBrowser({
     await expect(
       page.getByRole("heading", { name: "Profilim", exact: true }),
     ).toBeVisible();
+    const guestContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      timezoneId: "Europe/Istanbul",
+    });
+    await guestContext.route("**/*", (route) =>
+      new URL(route.request().url()).origin === base
+        ? route.continue()
+        : route.fulfill({ status: 200, body: "Test provider" }),
+    );
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto(base + "/profil");
+    await guestPage.evaluate(
+      (item) => localStorage.setItem("woya-cart-v1", JSON.stringify([item])),
+      {
+        slug: productSlug,
+        title: "Test ürün",
+        image: "/images/woya-logo-white.png",
+        quantity: 1,
+        configuration: {
+          source: "product",
+          pricingMode: "standard",
+          dimensions: defaultDimensions(initialPricing, "rectangle"),
+        },
+      },
+    );
+    await guestPage.goto(base + "/odeme");
+    await guestPage
+      .getByLabel("Ad soyad", { exact: true })
+      .fill("Mobil Misafir");
+    await guestPage
+      .getByLabel("E-posta", { exact: true })
+      .fill("mobile-guest@example.test");
+    await guestPage.getByLabel("Telefon", { exact: true }).fill("05551234567");
+    await guestPage
+      .getByLabel(/^Açık adres/)
+      .fill("Test Mahallesi Mobil Sokak No 6 Ankara");
+    await guestPage.locator('input[name="consent"]').check();
+    await guestPage.locator('button[type="submit"]').click();
+    await guestPage.waitForURL("**/odeme/islem/*", { timeout: 30000 });
+    const guestRef = guestPage.url().split("/").pop()!;
+    await guestPage.goto(base + "/profil/misafir");
+    await guestPage
+      .getByLabel("Sipariş numarası", { exact: true })
+      .fill(guestRef);
+    await guestPage
+      .getByLabel("Siparişteki e-posta adresi", { exact: true })
+      .fill("mobile-guest@example.test");
+    await guestPage
+      .getByRole("button", {
+        name: "Güvenli erişim bağlantısı iste",
+        exact: true,
+      })
+      .click();
+    await expect(guestPage.getByRole("status")).toContainText(
+      "Bilgiler uygunsa",
+    );
+    await guestPage.goto(
+      base +
+        "/profil/misafir-dogrula#token=" +
+        mailToken("mobile-guest@example.test"),
+    );
+    await guestPage
+      .getByRole("button", { name: "Siparişi görüntüle", exact: true })
+      .click();
+    await guestPage.waitForURL("**/profil/siparisler/*", { timeout: 30000 });
+    await expect(guestPage.getByText(guestRef, { exact: true }).filter({ visible: true })).toBeVisible();
+    await guestPage.screenshot({
+      path: "work/customer-qa/mobile-guest-order.png",
+      fullPage: true,
+    });
+    await guestContext.close();
+    console.log(
+      "PASS browser: mobile guest checkout and emailed single-use order access",
+    );
     await page.goto(base + "/");
     await expect(page.getByRole("main")).toBeVisible();
     expect(await page.locator("[data-nextjs-dialog]").count()).toBe(0);

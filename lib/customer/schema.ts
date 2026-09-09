@@ -39,10 +39,25 @@ export const addressSchema = z
   .strict();
 export const billingSchema = z
   .object({
+    type: z.enum(["individual", "company"]).default("individual"),
+    companyName: z.string().trim().max(200).optional(),
+    taxOffice: z.string().trim().max(100).optional(),
+    taxNumber: z
+      .string()
+      .regex(/^\d{10,11}$/)
+      .optional(),
     name: z.string().trim().min(3).max(60),
     address: z.string().trim().min(15).max(400),
   })
   .strict();
+export const checkoutBillingSchema = billingSchema.superRefine((v, ctx) => {
+  if (v.type === "company" && (!v.companyName || !v.taxOffice || !v.taxNumber))
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "Kurumsal fatura için unvan, vergi dairesi ve vergi numarası gerekli.",
+    });
+});
 export const cartItemsSchema = z
   .array(
     z

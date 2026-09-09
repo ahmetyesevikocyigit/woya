@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { configurationSchema } from "../pricing";
-import { billingSchema } from "../customer/schema";
+import { checkoutBillingSchema } from "../customer/schema";
 
 export const checkoutItemsSchema = z
   .array(
@@ -42,7 +42,7 @@ export const checkoutSchema = z
     quoteHash: z.string().regex(/^[a-f0-9]{64}$/),
     items: checkoutItemsSchema,
     customer: customerSchema,
-    billing: billingSchema.optional(),
+    billing: checkoutBillingSchema.optional(),
     accountId: z.uuid().nullable().optional(),
     note: z.string().trim().max(1000),
     consent: z.literal(true),
@@ -78,6 +78,7 @@ export type CheckoutQuote = {
   shipping: number;
   total: number;
   hash: string;
+  store: import("../commerce/schema").StoreSettings;
 };
 export const paymentLabels: Record<PaymentState, string> = {
   creating: "Ödeme hazırlanıyor",

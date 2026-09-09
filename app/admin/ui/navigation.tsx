@@ -23,6 +23,7 @@ const links = [
   ["/admin/kategoriler", "Kategoriler", Layers],
   ["/admin/siparisler", "Siparişler", ClipboardList],
   ["/admin/musteri-islemleri", "Müşteri İşlemleri", ClipboardList],
+  ["/admin/magaza", "Mağaza ve Bildirimler", ClipboardList],
   ["/admin/icerik", "Site İçeriği", FileText],
   ["/admin/medya", "Görsel Kütüphanesi", Image],
   ["/admin/guvenlik", "Güvenlik", ShieldCheck],

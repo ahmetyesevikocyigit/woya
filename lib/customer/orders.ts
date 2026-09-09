@@ -1,3 +1,4 @@
+import { enqueueOrderEmail } from "../commerce/outbox";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { db } from "../admin/db";
@@ -17,7 +18,7 @@ import { emailConfiguration, sendAccountEmail } from "./email";
 import { genericMail } from "./accounts";
 import { kindLabels, requestTransitions } from "./schema";
 const missing = () => new HttpError(404, "Sipariş veya başvuru bulunamadı.");
-async function accessIdentity() {
+export async function accessIdentity() {
   return {
     session: await customerSession(),
     guest: await cookieHash(guestCookie),
@@ -38,7 +39,7 @@ export async function orderAccess(
     );
   // No request-supplied user id; guest grants cease working immediately after account linkage.
   const [row] =
-    await tx`SELECT id,reference,status,customer,items,billing,shipment,note,payment,history,created_at,customer_id FROM woya_orders o
+    await tx`SELECT id,reference,status,customer,items,billing,shipment,legal_snapshot,note,payment,history,created_at,customer_id FROM woya_orders o
  WHERE reference=${reference} AND (customer_id=${session?.customer.id ?? null} OR (customer_id IS NULL AND EXISTS(SELECT 1 FROM woya_guest_sessions g WHERE g.order_id=o.id AND g.token_hash=${guest} AND g.expires_at>now()))) ${lock ? tx`FOR UPDATE` : tx``}`;
   if (!row) throw missing();
   return row;
@@ -63,6 +64,10 @@ export async function readOrder(reference: string) {
       ...order,
       linked: Boolean(customer_id),
       requests: await requestsFor(tx, row.id),
+      documents:
+        await tx`SELECT id,bytes,created_at FROM woya_private_documents WHERE order_id=${row.id} ORDER BY created_at DESC`,
+      refunds:
+        await tx`SELECT amount,provider_reference,performed_at,reason FROM woya_refunds WHERE order_id=${row.id} ORDER BY created_at DESC`,
     };
   });
 }
@@ -296,6 +301,16 @@ export async function adminRequestUpdate(
     await tx`UPDATE woya_order_requests SET status=${input.status},version=version+1,history=history || ${tx.json([{ status: input.status, at: new Date().toISOString() }])}::jsonb WHERE id=${request.id}`;
     await tx`INSERT INTO woya_order_messages(id,request_id,submission_id,author,body,operation_hash) VALUES(${randomUUID()},${request.id},${input.submissionId},'admin',${input.body},${operationHash})`;
     await tx`INSERT INTO woya_audit(actor,action,entity) VALUES(${actor},${`customer-request:${input.status}`},${request.id})`;
+    await enqueueOrderEmail(
+      tx,
+      request.order_id,
+      `support:${input.submissionId}`,
+      "Başvurunuza yanıt var",
+      input.body +
+        (input.status === "approved" && request.kind !== "support"
+          ? "\nBaşvurunuz uygun bulundu. Para iadesi tamamlandığında ayrıca bildirilecektir."
+          : ""),
+    );
     return { ok: true };
   });
 }

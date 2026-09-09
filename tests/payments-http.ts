@@ -50,6 +50,7 @@ async function main() {
       "002-admin-security.sql",
       "003-paytr.sql",
       "004-customer-accounts.sql",
+      "005-commerce.sql",
     ])
       await pg.exec(await readFile(`db/${file}`, "utf8"));
     await pg.exec(await readFile("db/003-paytr.sql", "utf8"));
@@ -85,6 +86,9 @@ async function main() {
     await pg.query(
       "INSERT INTO woya_admin_credentials(identity,password_hash) VALUES('woya-admin',$1)",
       [await bcrypt.hash(password, 12)],
+    );
+    await pg.exec(
+      'UPDATE woya_store_settings SET data=\'{"shippingFee":10000,"freeShippingThreshold":200000,"productionDays":3,"deliveryDays":2,"replyTo":"support@example.test","notificationEmail":"merchant@example.test"}\'::jsonb',
     );
     await socket.start();
     child = spawn(
@@ -454,12 +458,30 @@ async function main() {
       "Paid state is not downgraded",
     );
 
+    const installment = await begin();
+    await callback(installment.oid, { total_amount: "150000" });
+    const installmentResult = await (
+      await api(`/api/odeme/durum?order=${installment.oid}`)
+    ).json();
+    check(
+      installmentResult.payment.state === "paid" &&
+        installmentResult.payment.amount === 135000 &&
+        installmentResult.payment.receivedAmount === 150000,
+      "Installment principal and signed captured total are stored separately",
+    );
+    const underpaid = await begin();
+    await callback(underpaid.oid, { total_amount: "134999" });
+    check(
+      (await (await api(`/api/odeme/durum?order=${underpaid.oid}`)).json())
+        .payment.state === "review",
+      "Captured total below principal is never fulfilled",
+    );
     const mismatch = await begin();
-    await callback(mismatch.oid, { total_amount: "135001" });
+    await callback(mismatch.oid, { payment_amount: "135001" });
     check(
       (await (await api(`/api/odeme/durum?order=${mismatch.oid}`)).json())
         .payment.state === "review",
-      "Signed mismatched amount requires manual review, not fulfillment",
+      "Mismatched principal requires manual review, not fulfillment",
     );
     const reviewOrder = (
       await pg.query<{ id: string; version: number }>(
@@ -586,6 +608,15 @@ async function main() {
       [live.oid],
     );
     await callback(live.oid, { test_mode: "0" });
+    await callback(live.oid, { test_mode: "0" });
+    const outbox = await pg.query(
+      "SELECT event_key FROM woya_email_outbox WHERE order_id=(SELECT id FROM woya_orders WHERE reference=$1)",
+      [live.oid],
+    );
+    check(
+      outbox.rows.length === 2,
+      "Duplicate paid callback queues exactly one customer and one merchant email",
+    );
     const liveOrder = (
       await pg.query<{ id: string; status: string; version: number }>(
         "SELECT id,status,version FROM woya_orders WHERE reference=$1",

@@ -41,7 +41,8 @@ globalThis.fetch = async (input, init) => {
     total !== Number(form.get("payment_amount")) ||
     form.has("merchant_key") ||
     form.has("merchant_salt") ||
-    form.get("no_installment") !== "1"
+    form.get("no_installment") !== "0" ||
+    form.get("max_installment") !== "0"
   )
     return Response.json({ status: "failed", reason: "INVALID_TEST_PROTOCOL" });
   if (form.get("email") === "timeout@example.test")
