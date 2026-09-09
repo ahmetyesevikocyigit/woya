@@ -2275,6 +2275,7 @@ img {
 .other-products-section {
   background: var(--paper);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 34px;
 }
 
@@ -2375,6 +2376,7 @@ img {
 
 .product-gallery-grid {
   display: grid;
+  min-width: 0;
   gap: 18px;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   margin: 0 auto;
@@ -2384,6 +2386,8 @@ img {
 
 .product-gallery-shell {
   display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
   margin: 0 auto;
   max-width: 1240px;
@@ -5783,6 +5787,8 @@ img {
 
 .catalog-results-head {
   align-items: end;
+  flex-wrap: wrap;
+  min-width: 0;
   border-bottom: 1px solid rgba(21, 24, 28, 0.1);
   display: flex;
   gap: 22px;

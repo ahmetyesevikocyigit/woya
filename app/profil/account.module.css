@@ -1,47 +1,133 @@
 .shell {
   min-height: 100vh;
-  background: #fff;
-  color: #171717;
+  background: var(--paper);
+  color: var(--ink);
 }
 .main {
-  max-width: 1120px;
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(28px, 4vw, 60px);
+  max-width: 1240px;
+  min-height: 620px;
   margin: 0 auto;
-  padding: 46px 28px 80px;
+  padding: 56px 28px 72px;
+}
+.content {
+  min-width: 0;
 }
 .main h1 {
-  font-size: clamp(1.65rem, 3vw, 2.2rem);
+  font-size: clamp(1.6rem, 2.6vw, 2rem);
   font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
   margin: 0 0 28px;
 }
-.nav {
+.sidebar {
+  min-width: 0;
+}
+.identity {
   display: flex;
-  gap: 12px 26px;
-  flex-wrap: wrap;
-  border-bottom: 1px solid #dedbd4;
-  padding-bottom: 20px;
-  margin-bottom: 32px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px 24px;
+}
+.identity > div {
+  min-width: 0;
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  height: 44px;
+  border: 1px solid var(--sage-line);
+  border-radius: 50%;
+  color: var(--sage-strong);
+  background: var(--sage);
+  font-size: 14px;
+}
+.identityName {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.identityEmail {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 5px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.nav {
+  display: grid;
+  gap: 16px;
+}
+.navPrimary,
+.navSecondary {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.navSecondary {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
 }
 .nav a {
-  text-decoration: none;
-  padding: 8px 0;
-  border-bottom: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--muted);
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+.nav a svg {
+  flex-shrink: 0;
 }
 .nav a:hover {
-  border-color: #927641;
+  background: #eee8de80;
+  color: var(--ink);
+}
+.nav a[aria-current="page"] {
+  background: var(--sage);
+  color: var(--ink);
+}
+.logout {
+  margin: 22px 12px 0;
+}
+.logout .button {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--sage-line);
+  color: var(--muted);
+  padding: 8px 0;
+  min-height: 40px;
+  font-size: 13px;
 }
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 28px;
+  gap: 20px;
 }
 .panel {
-  border: 1px solid #ddd9d1;
-  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--white);
+  padding: clamp(20px, 3vw, 32px);
   min-width: 0;
   margin-bottom: 24px;
 }
 .panel h2 {
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   font-weight: 500;
   margin: 0 0 22px;
 }
@@ -52,7 +138,7 @@
 .form {
   display: grid;
   gap: 18px;
-  max-width: 620px;
+  max-width: 100%;
 }
 .form fieldset {
   display: grid;
@@ -72,13 +158,19 @@
 .form select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #c9c6c0;
-  border-radius: 0;
+  border: 1px solid #d9d5cd;
+  border-radius: 3px;
   background: white;
   color: #171717;
   padding: 12px;
   font: inherit;
-  min-height: 44px;
+  min-height: 48px;
+  transition: border-color 150ms ease;
+}
+.form input:hover,
+.form textarea:hover,
+.form select:hover {
+  border-color: var(--sage-strong);
 }
 .form textarea {
   resize: vertical;
@@ -107,6 +199,8 @@
   padding: 11px 19px;
   cursor: pointer;
   font: inherit;
+  font-size: 14px;
+  border-radius: 3px;
   text-decoration: none;
   border: 1px solid #171717;
   background: #171717;
@@ -218,8 +312,16 @@
   outline-offset: 4px;
 }
 .empty {
-  padding: 26px 0;
-  color: #5c5953;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--white);
+  line-height: 1.8;
+  color: var(--muted);
+}
+.empty a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .hint {
   font-size: 0.88rem;
@@ -229,42 +331,132 @@
 .section {
   margin: 24px 0;
 }
-.footer {
-  border-top: 1px solid #e4e1dc;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  padding: 22px 28px;
-  justify-content: center;
-  font-size: 0.85rem;
-}
 .main small {
   line-height: 1.6;
 }
 .wide {
   grid-column: 1/-1;
 }
-@media (max-width: 700px) {
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.emailInfo {
+  display: grid;
+  gap: 6px;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.emailInfo span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.emailInfo p {
+  margin: 0;
+}
+.emailInfo a {
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  margin-top: 5px;
+}
+.content > .form {
+  padding: 28px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+@media (max-width: 1000px) {
   .main {
-    padding: 30px 18px 60px;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 24px;
   }
   .grid {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 0;
   }
-  .panel {
-    padding: 18px;
+}
+@media (max-width: 700px) {
+  .main {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 24px 18px 40px;
+    gap: 28px;
+    min-height: 0;
+  }
+  .sidebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 20px;
+  }
+  .identity {
+    padding: 0 0 18px;
+  }
+  .identityName {
+    font-size: 15px;
+  }
+  .identityEmail {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
   }
   .nav {
-    gap: 6px 20px;
-    font-size: 0.9rem;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    gap: 12px;
+  }
+  .navPrimary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .nav a {
+    padding: 10px;
+    font-size: 13px;
+    gap: 9px;
+  }
+  .navPrimary a {
+    border: 1px solid var(--line);
+  }
+  .navPrimary a[aria-current="page"] {
+    border-color: var(--sage-line);
+  }
+  .navSecondary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding-top: 0;
+    border: 0;
+  }
+  .navSecondary a {
+    min-height: 40px;
+    padding: 4px 0;
+    font-size: 12px;
+  }
+  .logout {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0 0 0 12px;
+    align-self: start;
+  }
+  .logout .button {
+    font-size: 12px;
+  }
+  .main h1 {
+    margin-bottom: 20px;
+  }
+  .panel {
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .fieldGrid {
+    gap: 16px;
   }
   .details {
-    grid-template-columns: 100px minmax(0, 1fr);
-  }
-  .button,
-  .secondary {
-    font-size: 0.9rem;
+    grid-template-columns: 90px minmax(0, 1fr);
   }
   .form input,
   .form textarea,
@@ -274,10 +466,75 @@
   .reference {
     font-size: 0.85rem;
   }
+  .content > .form,
+  .empty {
+    padding: 20px;
+  }
+}
+@media (max-width: 380px) {
+  .fieldGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .shell :global(.site-header) {
   position: relative;
   background: #151515;
   top: auto;
+}
+
+.orders {
+  display: grid;
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.orderCard {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--white);
+  transition: border-color 150ms ease;
+}
+.orderCard:hover {
+  border-color: var(--sage-strong);
+}
+.orderCard p {
+  margin: 0;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.orderCard .row {
+  font-size: 13px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.orderCard .reference {
+  font-size: 12px;
+}
+.orderCard .orderStatus {
+  font-size: 13px;
+  color: var(--sage-strong);
+}
+.orderBottom {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.orderBottom strong {
+  font-size: 18px;
+  font-weight: 500;
+}
+.orderBottom span {
+  font-size: 13px;
+}
+@media (max-width: 700px) {
+  .orderCard {
+    padding: 20px;
+  }
 }

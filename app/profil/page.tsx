@@ -1,5 +1,5 @@
 import { pageSession } from "@/lib/customer/auth";
-import { LoginForm, Logout, ProfileForm } from "./forms";
+import { LoginForm, ProfileForm } from "./forms";
 import styles from "./account.module.css";
 export default async function ProfilePage({
   searchParams,
@@ -23,9 +23,9 @@ export default async function ProfilePage({
         </p>
       )}
       <section className={styles.panel}>
+        {session && <h2>Kişisel bilgiler</h2>}
         {session ? <ProfileForm customer={session.customer} /> : <LoginForm />}
       </section>
-      {session && <Logout />}
     </>
   );
 }

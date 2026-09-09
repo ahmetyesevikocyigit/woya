@@ -31,44 +31,47 @@ export default async function Page({
           <Link href="/profil/misafir">güvenli erişim bağlantısı isteyin</Link>.
         </p>
       ) : (
-        <ul className={styles.list}>
+        <ul className={styles.orders}>
           {data.orders.map((o) => (
             <li key={o.reference}>
-              <div className={styles.row}>
-                <Link
-                  className={styles.reference}
-                  href={`/profil/siparisler/${o.reference}`}
-                >
-                  {o.reference}
-                </Link>
-                <span>
-                  {new Date(o.created_at).toLocaleString("tr-TR", {
-                    timeZone: "Europe/Istanbul",
-                  })}
-                </span>
-              </div>
-              <p>
-                {statusLabels[o.status as Order["status"]]} ·{" "}
-                {o.payment
-                  ? `${o.payment.testMode ? "TEST · " : ""}${paymentLabels[o.payment.state as keyof typeof paymentLabels]}`
-                  : "Çevrimiçi ödeme yok"}
-              </p>
-              <p>
-                {o.items
-                  .map(
-                    (i: { title: string; quantity: number }) =>
-                      `${i.title} (${i.quantity})`,
-                  )
-                  .join(" · ")}
-              </p>
-              {o.payment && (
-                <p>
-                  {new Intl.NumberFormat("tr-TR", {
-                    style: "currency",
-                    currency: "TRY",
-                  }).format(o.payment.amount / 100)}
+              <Link
+                className={styles.orderCard}
+                href={`/profil/siparisler/${o.reference}`}
+              >
+                <div className={styles.row}>
+                  <span className={styles.reference}>{o.reference}</span>
+                  <span className={styles.muted}>
+                    {new Date(o.created_at).toLocaleString("tr-TR", {
+                      timeZone: "Europe/Istanbul",
+                    })}
+                  </span>
+                </div>
+                <p className={styles.orderStatus}>
+                  {statusLabels[o.status as Order["status"]]} ·{" "}
+                  {o.payment
+                    ? `${o.payment.testMode ? "TEST · " : ""}${paymentLabels[o.payment.state as keyof typeof paymentLabels]}`
+                    : "Çevrimiçi ödeme yok"}
                 </p>
-              )}
+                <p>
+                  {o.items
+                    .map(
+                      (i: { title: string; quantity: number }) =>
+                        `${i.title} (${i.quantity})`,
+                    )
+                    .join(" · ")}
+                </p>
+                <div className={styles.orderBottom}>
+                  {o.payment && (
+                    <strong>
+                      {new Intl.NumberFormat("tr-TR", {
+                        style: "currency",
+                        currency: "TRY",
+                      }).format(o.payment.amount / 100)}
+                    </strong>
+                  )}
+                  <span>Detayları görüntüle →</span>
+                </div>
+              </Link>
             </li>
           ))}
         </ul>

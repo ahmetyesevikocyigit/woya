@@ -262,26 +262,28 @@ export function TokenForm({
 export function ProfileForm({ customer }: { customer: Customer }) {
   return (
     <ActionForm action="profile" refresh>
-      <label>
-        Ad
-        <input
-          name="firstName"
-          autoComplete="given-name"
-          maxLength={29}
-          required
-          defaultValue={customer.firstName}
-        />
-      </label>
-      <label>
-        Soyad
-        <input
-          name="lastName"
-          autoComplete="family-name"
-          maxLength={29}
-          required
-          defaultValue={customer.lastName}
-        />
-      </label>
+      <div className={styles.fieldGrid}>
+        <label>
+          Ad
+          <input
+            name="firstName"
+            autoComplete="given-name"
+            maxLength={29}
+            required
+            defaultValue={customer.firstName}
+          />
+        </label>
+        <label>
+          Soyad
+          <input
+            name="lastName"
+            autoComplete="family-name"
+            maxLength={29}
+            required
+            defaultValue={customer.lastName}
+          />
+        </label>
+      </div>
       <label>
         Telefon
         <input
@@ -292,8 +294,11 @@ export function ProfileForm({ customer }: { customer: Customer }) {
           defaultValue={customer.phone}
         />
       </label>
-      <p>E-posta: {customer.email}</p>
-      <Link href="/profil/guvenlik">E-posta veya şifre değiştir</Link>
+      <div className={styles.emailInfo}>
+        <span>E-posta</span>
+        <p>{customer.email}</p>
+        <Link href="/profil/guvenlik">E-posta veya şifre değiştir</Link>
+      </div>
     </ActionForm>
   );
 }

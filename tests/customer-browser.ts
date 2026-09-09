@@ -54,12 +54,24 @@ export async function verifyBrowser({
       },
     );
     await page.reload();
-    await page.getByLabel("E-posta", { exact: true }).fill(customerEmail);
-    await page.getByLabel(/^Şifre/).fill(password);
+    await page
+      .getByRole("main")
+      .getByLabel("E-posta", { exact: true })
+      .fill(customerEmail);
+    await page
+      .getByRole("main")
+      .getByLabel(/^Şifre/)
+      .fill(password);
     await page.getByRole("button", { name: "Giriş yap", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Profilim", exact: true }),
     ).toBeVisible();
+    await page
+      .getByRole("main")
+      .getByLabel("Telefon", { exact: true })
+      .fill("05551234567");
+    await page.getByRole("button", { name: "Kaydet", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Profil kaydedildi");
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem("woya-cart-v1")))
       .toBe(null);
@@ -73,51 +85,85 @@ export async function verifyBrowser({
     console.log(
       "PASS browser: login merges the guest cart once, clears guest storage and persists account selections",
     );
-    await page.goto(base + "/profil/adresler");
-    await page.getByRole("button", { name: "Adres ekle", exact: true }).click();
-    await page.getByLabel("Adres başlığı", { exact: true }).fill("Ev");
     await page
+      .getByRole("navigation", { name: "Hesap menüsü" })
+      .getByRole("link", { name: "Adreslerim", exact: true })
+      .click();
+    await expect(
+      page
+        .getByRole("navigation", { name: "Hesap menüsü" })
+        .getByRole("link", { name: "Adreslerim", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await page.getByRole("button", { name: "Adres ekle", exact: true }).click();
+    await page
+      .getByRole("main")
+      .getByLabel("Adres başlığı", { exact: true })
+      .fill("Ev");
+    await page
+      .getByRole("main")
       .getByLabel("Ad soyad", { exact: true })
       .fill("Tarayıcı Test Müşteri");
-    await page.getByLabel("Telefon", { exact: true }).fill("05551234567");
     await page
+      .getByRole("main")
+      .getByLabel("Telefon", { exact: true })
+      .fill("05551234567");
+    await page
+      .getByRole("main")
       .getByLabel(/^Açık adres/)
       .fill("Test Mahallesi Örnek Sokak No 5 İstanbul");
-    await page.getByLabel("Varsayılan teslimat adresi").check();
-    await page.getByLabel("Varsayılan fatura adresi").check();
+    await page
+      .getByRole("main")
+      .getByLabel("Varsayılan teslimat adresi")
+      .check();
+    await page.getByRole("main").getByLabel("Varsayılan fatura adresi").check();
     await page.getByRole("button", { name: "Kaydet", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Ev", exact: true }),
     ).toBeVisible();
     await page.goto(base + "/odeme");
-    await expect(page.getByLabel("Ad soyad", { exact: true })).toHaveValue(
-      "Tarayıcı Test Müşteri",
-    );
-    await page.getByLabel("Fatura adresim farklı", { exact: true }).check();
+    await expect(
+      page.getByRole("main").getByLabel("Ad soyad", { exact: true }),
+    ).toHaveValue("Tarayıcı Test Müşteri");
     await page
+      .getByRole("main")
+      .getByLabel("Fatura adresim farklı", { exact: true })
+      .check();
+    await page
+      .getByRole("main")
       .getByLabel(/^Fatura açık adresi/)
       .fill("Fatura Mahallesi Başka Sokak No 6 Ankara");
-    await expect(page.getByLabel(/^Açık adres/)).toHaveValue(
+    await expect(page.getByRole("main").getByLabel(/^Açık adres/)).toHaveValue(
       "Test Mahallesi Örnek Sokak No 5 İstanbul",
     );
     console.log(
       "PASS browser: address management and independently editable checkout billing/delivery",
     );
     await page
+      .getByRole("main")
       .getByLabel("Fatura türü", { exact: true })
       .selectOption("company");
     await page
+      .getByRole("main")
       .getByLabel("Şirket unvanı", { exact: true })
       .fill("Örnek Test Ltd Şti");
     await page
+      .getByRole("main")
       .getByLabel("Vergi dairesi", { exact: true })
       .fill("Test Vergi Dairesi");
-    await page.getByLabel("Vergi numarası", { exact: true }).fill("1234567890");
+    await page
+      .getByRole("main")
+      .getByLabel("Vergi numarası", { exact: true })
+      .fill("1234567890");
     await page.locator('input[name="consent"]').check();
     await page.locator('button[type="submit"]').click();
     await page.waitForURL("**/odeme/islem/*");
     const orderReference = page.url().split("/").pop()!;
-    await page.goto(base + "/profil/siparisler/" + orderReference);
+    await page.goto(base + "/profil/siparisler");
+    await page
+      .getByRole("main")
+      .getByRole("link")
+      .filter({ hasText: orderReference })
+      .click();
     await expect(
       page.getByRole("heading", { name: "Sipariş detayı", exact: true }),
     ).toBeVisible();
@@ -151,10 +197,27 @@ export async function verifyBrowser({
         "profil/siparisler",
         "profil/siparisler/" + orderReference,
         "odeme",
+        "",
+        "koleksiyon",
+        "urunler/" + productSlug,
       ]) {
         // The layout audit waits for the application, not the load event of embedded resources.
         await page.goto(base + "/" + route, { waitUntil: "domcontentloaded" });
         await expect(page.getByRole("main")).toBeVisible();
+        if (route === "profil" && size.name === "mobile") {
+          await page.locator(".mobile-menu:visible > summary").click();
+          await expect(page.locator(".mobile-menu:visible")).toHaveAttribute(
+            "open",
+            "",
+          );
+          await expect(
+            page.locator(".mobile-menu:visible > summary"),
+          ).toHaveAttribute("aria-label", "Menüyü kapat");
+          await page.keyboard.press("Escape");
+          await expect(
+            page.locator(".mobile-menu:visible"),
+          ).not.toHaveAttribute("open", "");
+        }
         if (route === "odeme") {
           await expect(
             page.getByRole("heading", {
@@ -163,7 +226,7 @@ export async function verifyBrowser({
             }),
           ).toBeVisible();
           await expect(
-            page.getByLabel("Ad soyad", { exact: true }),
+            page.getByRole("main").getByLabel("Ad soyad", { exact: true }),
           ).toBeVisible();
         }
         await expect
@@ -173,6 +236,10 @@ export async function verifyBrowser({
             ),
           )
           .toBe(true);
+        if (route === "profil")
+          await page.screenshot({
+            path: `work/customer-qa/${size.name}-profile-viewport.png`,
+          });
         await page.screenshot({
           path: `work/customer-qa/${size.name}-${route.replaceAll("/", "-")}.png`,
           fullPage: true,
@@ -192,16 +259,26 @@ export async function verifyBrowser({
       await page.evaluate(() => localStorage.getItem("woya-cart-v1")),
     ).toBe(null);
     await page.goto(base + "/profil/kayit");
-    await page.getByLabel("Ad", { exact: true }).fill("Form");
-    await page.getByLabel("Soyad", { exact: true }).fill("Test");
+    await page.getByRole("main").getByLabel("Ad", { exact: true }).fill("Form");
+    await page
+      .getByRole("main")
+      .getByLabel("Soyad", { exact: true })
+      .fill("Test");
     const email = "browser-registration@example.test";
-    await page.getByLabel("E-posta", { exact: true }).fill(email);
-    await page.getByLabel(/^Şifre/).fill(password);
+    await page
+      .getByRole("main")
+      .getByLabel("E-posta", { exact: true })
+      .fill(email);
+    await page
+      .getByRole("main")
+      .getByLabel(/^Şifre/)
+      .fill(password);
     await resetLimits();
     await page.getByRole("button", { name: "Kayıt ol", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Bilgiler uygunsa");
     await page.goto(base + "/profil/dogrula#token=" + mailToken(email));
     await page
+      .getByRole("main")
       .getByLabel("Kayıt sırasında belirlediğiniz şifre")
       .fill(password);
     await page
@@ -211,7 +288,7 @@ export async function verifyBrowser({
     expect(page.url()).not.toContain("token");
     // Keyboard can enter and submit the login form; inspect focus without mouse.
     await page.goto(base + "/profil");
-    await page.getByLabel("E-posta", { exact: true }).focus();
+    await page.getByRole("main").getByLabel("E-posta", { exact: true }).focus();
     await page.keyboard.type(email);
     await page.keyboard.press("Tab");
     await page.keyboard.type(password);
@@ -246,13 +323,19 @@ export async function verifyBrowser({
     );
     await guestPage.goto(base + "/odeme");
     await guestPage
+      .getByRole("main")
       .getByLabel("Ad soyad", { exact: true })
       .fill("Mobil Misafir");
     await guestPage
+      .getByRole("main")
       .getByLabel("E-posta", { exact: true })
       .fill("mobile-guest@example.test");
-    await guestPage.getByLabel("Telefon", { exact: true }).fill("05551234567");
     await guestPage
+      .getByRole("main")
+      .getByLabel("Telefon", { exact: true })
+      .fill("05551234567");
+    await guestPage
+      .getByRole("main")
       .getByLabel(/^Açık adres/)
       .fill("Test Mahallesi Mobil Sokak No 6 Ankara");
     await guestPage.locator('input[name="consent"]').check();
@@ -261,9 +344,11 @@ export async function verifyBrowser({
     const guestRef = guestPage.url().split("/").pop()!;
     await guestPage.goto(base + "/profil/misafir");
     await guestPage
+      .getByRole("main")
       .getByLabel("Sipariş numarası", { exact: true })
       .fill(guestRef);
     await guestPage
+      .getByRole("main")
       .getByLabel("Siparişteki e-posta adresi", { exact: true })
       .fill("mobile-guest@example.test");
     await guestPage
