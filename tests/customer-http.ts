@@ -314,6 +314,12 @@ async function main() {
       tokens[0].token_hash === hash(verify) && tokens[0].token_hash !== verify,
       "Verification token stored only as a hash",
     );
+    await good("resend", { email: customer.email });
+    const resentVerify = mailToken(customer.email);
+    check(
+      resentVerify !== verify,
+      "Resend issues a distinct verification link",
+    );
     const duplicate = await good("register", {
       ...registration,
       password: nextPassword,
@@ -338,9 +344,14 @@ async function main() {
     check(wrongToken.status === 400, "Unknown verification token fails closed");
     await good("verify", { token: verify, password });
     check(
+      (await api("verify", { token: resentVerify, password })).status === 400,
+      "Delayed original verification works after resend and consumes all sibling links",
+    );
+    check(
       (await api("verify", { token: verify, password })).status === 400,
       "Verification tokens are single-use",
     );
+    await resetLimits();
     const loginR = await api("login", { email: customer.email, password });
     assert.equal(loginR.status, 200);
     check(
@@ -1284,6 +1295,38 @@ async function main() {
         )
       ).rows.length === 0,
       "Failed delivery leaves no usable token",
+    );
+    await resetLimits();
+    await good("register", {
+      ...registration,
+      email: "resend-fail@example.test",
+    });
+    const delayedVerify = mailToken("resend-fail@example.test");
+    check(
+      (await api("resend", { email: "resend-fail@example.test" })).status ===
+        503,
+      "A failed resend reports the delivery error",
+    );
+    await good("verify", { token: delayedVerify, password });
+    check(
+      true,
+      "Failed resend preserves the original delayed verification link",
+    );
+    check(
+      (
+        await api("register", {
+          ...registration,
+          email: "ack-lost@example.test",
+        })
+      ).status === 503,
+      "Unknown mail acceptance is not reported as successful delivery",
+    );
+    const uncertainVerify = mailToken("ack-lost@example.test");
+    await good("verify", { token: uncertainVerify, password });
+    check(
+      (await api("verify", { token: uncertainVerify, password })).status ===
+        400,
+      "Mail delivered after a lost acknowledgement remains usable exactly once",
     );
     const oldCheckout = paymentCookie;
     const beforeClose = await count("woya_orders");

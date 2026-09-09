@@ -156,9 +156,21 @@ export async function sendMail(
       signal: AbortSignal.timeout(10000),
     });
     const raw = await response.text();
-    const body = raw.length <= 16000 ? JSON.parse(raw) : {};
+    let body: { id?: unknown; name?: unknown } = {};
+    try {
+      const parsed: unknown = raw.length <= 16000 ? JSON.parse(raw) : {};
+      if (parsed && typeof parsed === "object") body = parsed;
+    } catch {
+      // A non-JSON HTTP error is still an explicit provider response.
+    }
     if (response.ok && typeof body.id === "string")
       return { state: "sent", providerId: body.id, error: "" };
+    if (response.ok)
+      return {
+        state: "unknown",
+        providerId: null,
+        error: "provider_response_unknown",
+      };
     return {
       state:
         response.status === 429 ||

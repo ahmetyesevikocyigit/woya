@@ -4,7 +4,11 @@ import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "../admin/db";
 import { HttpError } from "../admin/auth";
-import { emailConfiguration, sendAccountEmail } from "./email";
+import {
+  AccountEmailDeliveryError,
+  emailConfiguration,
+  sendAccountEmail,
+} from "./email";
 import {
   clearPrivateContext,
   cookieHash,
@@ -49,7 +53,10 @@ export async function issueEmail(
         row.credential_version !== expectedVersion)
     )
       throw invalid();
-    await tx`DELETE FROM woya_customer_tokens WHERE customer_id=${customerId} AND purpose=${purpose}`;
+    // A delayed verification email must remain usable when a resend fails.
+    // Verification still requires the registration password, and consuming any
+    // link deletes all account tokens in the same transaction.
+    await tx`DELETE FROM woya_customer_tokens WHERE customer_id=${customerId} AND purpose=${purpose} AND (${purpose}<>'verify' OR expires_at<=now())`;
     const address = target || row.email;
     await tx`INSERT INTO woya_customer_tokens(token_hash,purpose,customer_id,email,credential_version,expires_at) VALUES(${hashToken(token)},${purpose},${customerId},${address},${row.credential_version},now()+interval '30 minutes')`;
     return String(address);
@@ -57,7 +64,10 @@ export async function issueEmail(
   try {
     await sendAccountEmail(email, token, purpose);
   } catch (e) {
-    await db()`DELETE FROM woya_customer_tokens WHERE token_hash=${hashToken(token)}`;
+    // SMTP can accept DATA and lose the acknowledgement. Keep that link until
+    // its normal expiry instead of invalidating a potentially delivered email.
+    if (!(e instanceof AccountEmailDeliveryError && e.deliveryUncertain))
+      await db()`DELETE FROM woya_customer_tokens WHERE token_hash=${hashToken(token)}`;
     throw e;
   }
 }

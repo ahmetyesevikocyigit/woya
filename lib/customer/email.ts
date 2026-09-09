@@ -3,6 +3,14 @@ import { mailConfigured, sendMail } from "../commerce/mail-transport";
 import { databaseConfigured } from "../admin/db";
 import { storeSettings } from "../commerce/settings";
 import { HttpError } from "../http-error";
+export class AccountEmailDeliveryError extends HttpError {
+  constructor(public deliveryUncertain: boolean) {
+    super(
+      503,
+      "E-posta hizmetine ulaşılamadı. Lütfen daha sonra tekrar deneyin.",
+    );
+  }
+}
 export function emailConfiguration() {
   const from = process.env.CUSTOMER_EMAIL_FROM;
   let origin = "";
@@ -57,11 +65,12 @@ export async function sendAccountEmail(
       },
       `woya-${purpose}-${token}`,
     );
-    if (result.state !== "sent") throw new Error("EMAIL_FAILED");
-  } catch {
-    throw new HttpError(
-      503,
-      "E-posta hizmetine ulaşılamadı. Lütfen daha sonra tekrar deneyin.",
-    );
+    if (result.state !== "sent")
+      throw new AccountEmailDeliveryError(
+        result.state === "unknown" || result.error === "network_unknown",
+      );
+  } catch (error) {
+    if (error instanceof AccountEmailDeliveryError) throw error;
+    throw new AccountEmailDeliveryError(true);
   }
 }
