@@ -14,6 +14,43 @@ import {
   deliveryAnnouncement,
 } from "../lib/commerce/schema";
 import { checkoutBillingSchema } from "../lib/customer/schema";
+import { assertCheckoutReady } from "../lib/commerce/readiness";
+test("Live checkout needs verification or explicit owner approval, while delivery remains required", () => {
+  const settings = storeSettingsSchema.parse({
+    shippingFee: 5500,
+    totalDeliveryDays: 7,
+  });
+  const flags = { live: true, verified: false, ownerApproved: false };
+  assert.throws(() => assertCheckoutReady(settings, flags), /Mağaza satışa/);
+  assert.throws(
+    () => assertCheckoutReady(settings, { ...flags, verified: true }),
+    /Mağaza satışa/,
+  );
+  assert.doesNotThrow(() =>
+    assertCheckoutReady(settings, { ...flags, ownerApproved: true }),
+  );
+  assert.equal(settings.sellerName, "");
+  assert.ok(missingStoreSettings(settings).includes("termsText"));
+  assert.throws(
+    () =>
+      assertCheckoutReady(
+        { ...settings, shippingFee: null },
+        { ...flags, ownerApproved: true },
+      ),
+    /Teslimat koşulları/,
+  );
+  assert.throws(
+    () =>
+      assertCheckoutReady(
+        { ...settings, totalDeliveryDays: null },
+        { ...flags, ownerApproved: true },
+      ),
+    /Teslimat koşulları/,
+  );
+  assert.doesNotThrow(() =>
+    assertCheckoutReady(settings, { ...flags, live: false }),
+  );
+});
 test("Shipping and corporate billing fail closed without fabricated values", () => {
   const s = storeSettingsSchema.parse({});
   assert.equal(configuredShipping(999999, s), null);

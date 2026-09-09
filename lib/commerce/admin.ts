@@ -1,5 +1,6 @@
 import "server-only";
 import { mailConfigured, mailTransport } from "./mail-transport";
+import { paymentsAvailable } from "../payments/config";
 import { randomUUID } from "node:crypto";
 import { db } from "../admin/db";
 import { HttpError } from "../http-error";
@@ -34,6 +35,8 @@ export async function commerceSummary(orderId?: string) {
         Boolean(process.env.RESEND_WEBHOOK_SECRET),
       paytr: Boolean(process.env.PAYTR_MERCHANT_KEY),
       liveVerified: process.env.COMMERCE_LIVE_VERIFIED === "true",
+      liveApproved: process.env.COMMERCE_LIVE_APPROVED === "true",
+      liveEnabled: paymentsAvailable() && process.env.PAYTR_TEST_MODE === "0",
     },
   };
 }

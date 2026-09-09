@@ -39,6 +39,7 @@ const labels: Record<keyof StoreSettings, string> = {
   privacyText: "Kişisel veriler ve gizlilik metni",
 };
 type Summary = {
+  providers: { liveEnabled: boolean; liveApproved: boolean };
   settings: { data: StoreSettings; version: number };
   emails: {
     id: string;
@@ -335,6 +336,19 @@ export function CommercePanel({
               : `${(data.settings.data.freeShippingThreshold / 100).toLocaleString("tr-TR")} TL ve üzeri ücretsiz kargo`}
           </p>
           <h2>Satış hazırlığı</h2>
+          <p>
+            {data.providers.liveEnabled
+              ? "Canlı ödeme açık."
+              : "Canlı ödeme kapalı."}
+          </p>
+          {data.providers.liveEnabled &&
+            data.providers.liveApproved &&
+            missing.length > 0 && (
+              <p>
+                Canlı ödeme mağaza sahibinin onayıyla açıldı. Aşağıdaki bilgiler
+                henüz tamamlanmadı.
+              </p>
+            )}
           {missing.length ? (
             <ul>
               {missing.map((k) => (
@@ -345,8 +359,7 @@ export function CommercePanel({
             <p>Mağaza bilgileri tamamlandı.</p>
           )}
           <p className="admin-muted">
-            Eksik bilgileri bölüm bölüm kaydedebilirsiniz. Canlı ödeme, PayTR
-            testi tamamlandıktan sonra açılır.
+            Eksik bilgileri bölüm bölüm kaydedebilirsiniz.
           </p>
           <Link className="admin-inline-link" href="/admin/urunler">
             Ürün fiyatlarını düzenle

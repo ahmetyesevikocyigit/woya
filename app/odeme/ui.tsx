@@ -368,10 +368,17 @@ export function CheckoutForm({
             {summary && (
               <details>
                 <summary>Sipariş ön bilgilendirmesi ve sözleşme</summary>
-                <p>
-                  {summary.quote.store.sellerName} ·{" "}
-                  {summary.quote.store.sellerAddress}
-                </p>
+                {(summary.quote.store.sellerName ||
+                  summary.quote.store.sellerAddress) && (
+                  <p>
+                    {[
+                      summary.quote.store.sellerName,
+                      summary.quote.store.sellerAddress,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
                 <p>{deliveryAnnouncement(summary.quote.store)}</p>
                 {[
                   summary.quote.store.informationText,
@@ -379,7 +386,9 @@ export function CheckoutForm({
                 ].map((text, i) => (
                   <p style={{ whiteSpace: "pre-wrap" }} key={i}>
                     {text ||
-                      "Test işlemi — satış sözleşmesi henüz tamamlanmadı."}
+                      (summary.testMode
+                        ? "Test işlemi — satış sözleşmesi henüz tamamlanmadı."
+                        : "Bu metin henüz tamamlanmadı.")}
                   </p>
                 ))}
               </details>
