@@ -1,7 +1,7 @@
 name: WOYA verified release
 on:
   push:
-    branches: [main, feat/commerce-completion]
+    branches: [main, feat/commerce-review]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -36,6 +36,7 @@ jobs:
           pnpm test:customer
           pnpm test:customer:email
           pnpm test:commerce
+          pnpm test:smtp
       - run: pnpm build --webpack
       - run: pnpm test:admin:http && pnpm test:payments:http
       - run: pnpm exec playwright install --with-deps chromium

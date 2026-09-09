@@ -1,14 +1,19 @@
 import "server-only";
 import { db } from "../admin/db";
+import { mailConfigured, mailTransport, sendMail } from "./mail-transport";
 // Leave a one-hour margin before Resend's 24-hour idempotency expiry.
 export const retryWindowMs = 23 * 3600 * 1000;
 export async function deliverOne() {
-  if (!process.env.CUSTOMER_EMAIL_API_KEY) return false;
+  if (!mailConfigured()) return false;
   const row = await db().begin(async (tx) => {
     const [r] = await tx`SELECT * FROM woya_email_outbox WHERE
    (state IN ('queued','retry') AND next_attempt_at<=now()) OR (state='sending' AND lease_until<now())
    ORDER BY next_attempt_at LIMIT 1 FOR UPDATE SKIP LOCKED`;
     if (!r) return null;
+    if (mailTransport() === "smtp" && r.state === "sending") {
+      await tx`UPDATE woya_email_outbox SET state='unknown',error_code='smtp_worker_interrupted',lease_until=NULL,updated_at=now() WHERE id=${r.id}`;
+      return null;
+    }
     if (
       r.first_attempt_at &&
       Date.now() - new Date(r.first_attempt_at).getTime() >= retryWindowMs
@@ -20,40 +25,10 @@ export async function deliverOne() {
     return r;
   });
   if (!row) return false;
-  let providerId: string | null = null,
-    error = "network_unknown",
-    state = "retry";
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.CUSTOMER_EMAIL_API_KEY}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": row.event_key,
-      },
-      body: JSON.stringify(row.payload),
-      redirect: "error",
-      signal: AbortSignal.timeout(10000),
-    });
-    const raw = await response.text();
-    const body = raw.length <= 16000 ? JSON.parse(raw) : {};
-    if (response.ok && typeof body.id === "string") {
-      providerId = body.id;
-      state = "sent";
-      error = "";
-    } else {
-      error = `provider_${response.status}`;
-      state =
-        response.status === 429 ||
-        response.status >= 500 ||
-        (response.status === 409 &&
-          body.name === "concurrent_idempotent_requests")
-          ? "retry"
-          : "failed";
-    }
-  } catch {
-    /* Never log provider payloads or customer addresses. */
-  }
+  const result = await sendMail(row.payload, row.event_key);
+  const providerId = result.providerId;
+  let state: string = result.state;
+  const error = result.error;
   await db().begin(async (tx) => {
     // Webhook can beat the API response; reconcile saved events in the same transaction.
     if (providerId)

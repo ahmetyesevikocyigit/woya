@@ -1,4 +1,5 @@
 import "server-only";
+import { mailConfigured, mailTransport } from "./mail-transport";
 import { randomUUID } from "node:crypto";
 import { db } from "../admin/db";
 import { HttpError } from "../http-error";
@@ -26,8 +27,11 @@ export async function commerceSummary(orderId?: string) {
     missingPrices,
     payments,
     providers: {
-      email: Boolean(process.env.CUSTOMER_EMAIL_API_KEY),
-      webhook: Boolean(process.env.RESEND_WEBHOOK_SECRET),
+      email: mailConfigured(),
+      transport: mailTransport(),
+      webhook:
+        mailTransport() === "resend" &&
+        Boolean(process.env.RESEND_WEBHOOK_SECRET),
       paytr: Boolean(process.env.PAYTR_MERCHANT_KEY),
       liveVerified: process.env.COMMERCE_LIVE_VERIFIED === "true",
     },

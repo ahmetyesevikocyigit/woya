@@ -21,8 +21,7 @@ export async function enqueueOrderEmail(
     ? `${origin}/admin/siparisler/${orderId}`
     : `${origin}/profil/siparisler/${order.reference}`;
   const payload = {
-    from:
-      process.env.CUSTOMER_EMAIL_FROM || "WOYA <bildirim@mail.woyatablo.com>",
+    from: process.env.CUSTOMER_EMAIL_FROM || "WOYA <info@woyatablo.com>",
     to: [to || ""],
     ...(settings?.data.replyTo ? { reply_to: settings.data.replyTo } : {}),
     subject: `WOYA · ${subject}`,

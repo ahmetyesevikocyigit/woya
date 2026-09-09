@@ -28,13 +28,15 @@
     "catalog:prices": "tsx scripts/catalog-prices.ts",
     "catalog:prices:overwrite": "tsx scripts/catalog-prices.ts --overwrite",
     "test:commerce": "tsx --conditions=react-server --test tests/commerce-worker.test.ts",
-    "commerce:migrate": "tsx scripts/commerce-migrate.ts"
+    "commerce:migrate": "tsx scripts/commerce-migrate.ts",
+    "test:smtp": "tsx --conditions=react-server --test tests/smtp.test.ts"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
     "lucide-react": "1.38.0",
     "next": "16.3.3",
+    "nodemailer": "^10.0.1",
     "perspective-transform": "^1.1.3",
     "postgres": "^3.4.9",
     "react": "latest",
@@ -49,12 +51,15 @@
     "@electric-sql/pglite-socket": "^0.2.11",
     "@playwright/test": "^1.63.0",
     "@types/node": "26.4.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "latest",
     "@types/react-dom": "19.2.5",
+    "@types/smtp-server": "^3.5.13",
     "embedded-postgres": "18.4.0-beta.17",
     "eslint": "10.9.1",
     "eslint-config-next": "16.3.3",
     "prettier": "^3.9.6",
+    "smtp-server": "^3.19.9",
     "tsx": "^4.23.13",
     "typescript": "latest"
   }

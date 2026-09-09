@@ -7,6 +7,17 @@ import {
   missingStoreSettings,
   type StoreSettings,
 } from "@/lib/commerce/schema";
+const emailStates: Record<string, string> = {
+  queued: "Sırada",
+  sending: "Gönderiliyor",
+  retry: "Yeniden denenecek",
+  sent: "Posta sunucusu kabul etti",
+  delivered: "Teslim edildi",
+  failed: "Gönderilemedi",
+  unknown: "Sonuç belirsiz — teslim kaydını kontrol edin",
+  bounced: "Geri döndü",
+  complained: "Spam bildirimi",
+};
 const labels: Record<keyof StoreSettings, string> = {
   shippingFee: "Kargo bedeli (TL)",
   freeShippingThreshold: "Ücretsiz kargo eşiği (TL; yoksa boş bırakın)",
@@ -184,8 +195,9 @@ export function CommercePanel() {
       {!data.payments.length && <p>Kontrol bekleyen ödeme yok.</p>}
       <h2>Son 100 e-posta</h2>
       <p>
-        Belirsiz gönderimler tekrar önleme süresi dolduğunda durdurulur.
-        Sağlayıcı kaydı kontrol edilmeden yeniden gönderilmez.
+        Posta sunucusunun kabulü gelen kutusuna teslim edildiği anlamına gelmez.
+        Belirsiz gönderimler otomatik tekrarlanmaz; GüzelHosting teslim kaydı
+        kontrol edilir.
       </p>
       <div className="admin-table-wrap">
         <table>
@@ -201,7 +213,7 @@ export function CommercePanel() {
             {data.emails.map((m) => (
               <tr key={m.id}>
                 <td>{m.event_key}</td>
-                <td>{m.state}</td>
+                <td>{emailStates[m.state] || m.state}</td>
                 <td>{m.attempts}</td>
                 <td>{m.error_code || "—"}</td>
               </tr>
