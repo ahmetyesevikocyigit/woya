@@ -148,7 +148,7 @@ export function OrderView({
             <dt>Fatura</dt>
             <dd>
               {order.billing
-                ? `${order.billing.name}\n${order.billing.address}`
+                ? `${order.billing.companyName || order.billing.name}\n${order.billing.address}${order.billing.taxNumber ? `\n${order.billing.taxOffice} · ${order.billing.taxNumber}` : ""}`
                 : "Eski kayıtta ayrı fatura adresi yok."}
             </dd>
           </dl>
