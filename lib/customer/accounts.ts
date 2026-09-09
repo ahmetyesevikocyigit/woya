@@ -154,10 +154,13 @@ export async function consumeToken(
     )
       throw invalid();
     if (purpose === "verify") {
+      if (account.email !== row.email || account.verified_at) throw invalid();
       // Prevent an attacker pre-registering someone else's address with a known password.
       if (!password || !(await bcrypt.compare(password, account.password_hash)))
-        throw invalid();
-      if (account.email !== row.email || account.verified_at) throw invalid();
+        throw new HttpError(
+          400,
+          "Şifre kayıt sırasında belirlediğiniz şifreyle eşleşmiyor. Tekrar deneyin veya Şifremi unuttum bağlantısından yeni şifre belirleyin.",
+        );
       await tx`UPDATE woya_customers SET verified_at=now() WHERE id=${account.id}`;
     } else {
       if (purpose === "reset") {

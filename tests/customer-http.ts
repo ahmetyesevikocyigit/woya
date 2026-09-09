@@ -332,9 +332,15 @@ async function main() {
       (await api("login", { email: customer.email, password })).status === 401,
       "Unverified accounts cannot log in",
     );
+    const wrongVerificationPassword = await api("verify", {
+      token: verify,
+      password: nextPassword,
+    });
     check(
-      (await api("verify", { token: verify, password: nextPassword }))
-        .status === 400,
+      wrongVerificationPassword.status === 400 &&
+        (await wrongVerificationPassword.json()).error.includes(
+          "Şifre kayıt sırasında",
+        ),
       "Verification cannot activate a pre-registered account without its registration password",
     );
     const wrongToken = await api("verify", {
@@ -1328,6 +1334,34 @@ async function main() {
         400,
       "Mail delivered after a lost acknowledgement remains usable exactly once",
     );
+    const recovery = jar();
+    const recoveryEmail = "unverified-recovery@example.test";
+    await good("register", { ...registration, email: recoveryEmail }, recovery);
+    const beforeRecoveryToken = mailToken(recoveryEmail);
+    await good("forgot", { email: recoveryEmail }, recovery);
+    await good(
+      "reset",
+      { token: mailToken(recoveryEmail), password: nextPassword },
+      recovery,
+    );
+    await good(
+      "login",
+      { email: recoveryEmail, password: nextPassword },
+      recovery,
+    );
+    check(
+      (await good("session", undefined, recovery)).customer.email ===
+        recoveryEmail &&
+        (
+          await api(
+            "verify",
+            { token: beforeRecoveryToken, password },
+            recovery,
+          )
+        ).status === 400,
+      "An unverified customer can recover through their email, sign in with a new password and invalidate old verification links",
+    );
+    await good("logout", {}, recovery);
     const oldCheckout = paymentCookie;
     const beforeClose = await count("woya_orders");
     await good("close", { password, confirm: true });

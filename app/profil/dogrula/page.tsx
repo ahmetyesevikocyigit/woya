@@ -7,6 +7,9 @@ export default function Page() {
       <h1>E-postayı doğrula</h1>
       <TokenForm action="verify" />
       <p style={{ marginTop: 24 }}>
+        <Link href="/profil/sifremi-unuttum">Şifremi unuttum</Link>
+      </p>
+      <p style={{ marginTop: 24 }}>
         <Link href="/profil/dogrulama-gonder">
           Yeni doğrulama bağlantısı iste
         </Link>
