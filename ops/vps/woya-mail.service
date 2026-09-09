@@ -11,4 +11,4 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-TimeoutStartSec=45
+TimeoutStartSec=100
