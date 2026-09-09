@@ -38,7 +38,17 @@ jobs:
           pnpm test:commerce
           pnpm test:smtp
       - run: pnpm build --webpack
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Install Playwright Chromium and its system dependencies
+        run: |
+          # Playwright downloads its own pinned Chromium. The runner's unrelated
+          # Chrome apt feed can have inconsistent indexes during Google releases.
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          for source in Path('/etc/apt/sources.list.d').iterdir():
+              if source.suffix in ('.list', '.sources') and 'dl.google.com/linux/chrome' in source.read_text():
+                  source.rename(source.with_suffix(source.suffix + '.disabled'))
+          PY
+          pnpm exec playwright install --with-deps chromium
       - run: WOYA_ADMIN_BROWSER_TESTS=1 pnpm test:admin:http && pnpm test:payments:http
       - run: pnpm test:customer:browser
       - run: node scripts/package-vps.mjs
