@@ -1082,13 +1082,13 @@ async function main() {
           data: { ...product, active: false },
         })
       ).status === 200,
-      "Product deactivated",
+      "Product save keeps the product published",
     );
     check(
-      !(await (await fetch(`${base}/urunler`)).text()).includes(
+      (await (await fetch(`${base}/urunler`)).text()).includes(
         "http-test-urunu",
       ),
-      "Inactive product removed from storefront",
+      "Saving with the old inactive flag still publishes the product",
     );
     check(
       (
@@ -1514,5 +1514,5 @@ async function main() {
 }
 main().catch((e) => {
   console.error(e);
-  process.exitCode = 1;
+  process.exit(1);
 });

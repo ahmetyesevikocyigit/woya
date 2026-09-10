@@ -49,11 +49,18 @@ jobs:
                   source.rename(source.with_suffix(source.suffix + '.disabled'))
           PY
           pnpm exec playwright install --with-deps chromium
-      - run: WOYA_ADMIN_BROWSER_TESTS=1 pnpm test:admin:http && pnpm test:payments:http
+      - name: Verify complete admin and payment flows
+        run: |
+          set -euo pipefail
+          WOYA_ADMIN_BROWSER_TESTS=1 pnpm test:admin:http 2>&1 | tee /tmp/woya-admin-tests.log
+          grep -F "HTTP checks passed. Test database and uploads will be removed." /tmp/woya-admin-tests.log
+          pnpm test:payments:http 2>&1 | tee /tmp/woya-payment-tests.log
+          grep -F "payment HTTP checks passed." /tmp/woya-payment-tests.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cms-qa
+          overwrite: true
           path: work/cms-qa
           retention-days: 7
           if-no-files-found: ignore
