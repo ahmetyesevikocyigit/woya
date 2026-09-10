@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
 import assert from "node:assert/strict";
+import { isDeepStrictEqual } from "node:util";
 import bcrypt from "bcryptjs";
 import { randomBytes, randomUUID } from "node:crypto";
 import { initialPricing, defaultDimensions } from "../lib/pricing";
@@ -1470,7 +1471,7 @@ async function main() {
       const { measurementPricing: beforeMatrix, ...beforeData } = previous.data;
       const { measurementPricing: afterMatrix, ...afterData } = current.data;
       check(
-        JSON.stringify(beforeData) === JSON.stringify(afterData),
+        isDeepStrictEqual(beforeData, afterData),
         "Migration preserves existing product fields",
       );
       if (previous.data.type !== "rehber")

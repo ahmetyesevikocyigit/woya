@@ -44,7 +44,7 @@ async function main() {
         if (next === p) continue;
         await tx.unsafe(
           "UPDATE woya_products SET data=$1,version=version+1,updated_at=now() WHERE id=$2",
-          [JSON.stringify(next), row.id],
+          [JSON.stringify({ ...row.data, measurementPricing: next.measurementPricing }), row.id],
         );
         await tx.unsafe(
           "INSERT INTO woya_audit(actor,action,entity) VALUES('system:size-pricing','products:measurement-pricing',$1)",
@@ -56,7 +56,13 @@ async function main() {
       if (JSON.stringify(next) !== JSON.stringify(settings)) {
         await tx.unsafe(
           "INSERT INTO woya_content(id,data) VALUES('pricing',$1) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,version=woya_content.version+1",
-          [JSON.stringify(next)],
+          [JSON.stringify({
+            ...(pricing[0]?.data ?? settings),
+            builderSetPrice: next.builderSetPrice,
+            builderClockPrice: next.builderClockPrice,
+            builderSetPrices: next.builderSetPrices,
+            builderClockPrices: next.builderClockPrices,
+          })],
         );
         await tx.unsafe(
           "INSERT INTO woya_audit(actor,action,entity) VALUES('system:size-pricing','pricing:measurement-pricing','pricing')",
