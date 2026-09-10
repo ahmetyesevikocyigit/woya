@@ -411,9 +411,10 @@ async function main() {
       await fetch(`${base}/admin/urunler/yeni`, { headers: { cookie } })
     ).text();
     check(
-      editorHtml.includes("Fiyat (₺)") &&
-        editorHtml.includes("İndirimli fiyat (₺)"),
-      "Admin can enter standard prices for every product type",
+      editorHtml.includes("Ölçü seçin") &&
+        editorHtml.includes("Henüz ölçü eklenmedi.") &&
+        !editorHtml.includes('aria-label="Fiyat (₺)"'),
+      "Admin starts with a size picker and opens price fields after selection",
     );
     check(
       (await api("/api/admin/pricing", { version: 0, data: pricing }))
