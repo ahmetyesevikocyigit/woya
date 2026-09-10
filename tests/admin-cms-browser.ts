@@ -41,9 +41,9 @@ export async function verifyAdminCms({
     await expect(main.getByText("Mağazada aktif", { exact: true })).toHaveCount(
       0,
     );
-    await expect(main.getByRole("combobox", { name: "Kargo", exact: true })).toHaveValue(
-      "excluded",
-    );
+    await expect(
+      main.getByRole("combobox", { name: "Kargo", exact: true }),
+    ).toHaveValue("excluded");
     const productResponse = await context.request.post(
       base + "/api/admin/products",
       {
@@ -76,7 +76,9 @@ export async function verifyAdminCms({
     expect(productResponse.status()).toBe(200);
     const productId = (await productResponse.json()).id;
     await page.goto(base + "/admin/urunler/" + productId);
-    await main.getByRole("combobox", { name: "Kargo", exact: true }).selectOption("included");
+    await main
+      .getByRole("combobox", { name: "Kargo", exact: true })
+      .selectOption("included");
     await main.getByLabel("Fiyat (₺)", { exact: true }).fill("750");
     let productPosts = 0;
     page.on("request", (request) => {
@@ -105,9 +107,9 @@ export async function verifyAdminCms({
     await expect(page).toHaveURL(/admin\/urunler\?kaydedildi=1/);
     expect(productPosts).toBe(1);
     await page.goto(base + "/admin/urunler/" + productId);
-    await expect(main.getByRole("combobox", { name: "Kargo", exact: true })).toHaveValue(
-      "included",
-    );
+    await expect(
+      main.getByRole("combobox", { name: "Kargo", exact: true }),
+    ).toHaveValue("included");
     await expect(main.getByLabel("Fiyat (₺)", { exact: true })).toHaveValue(
       "750",
     );

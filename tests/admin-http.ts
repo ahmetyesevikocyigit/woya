@@ -1,5 +1,4 @@
-import { PGlite } from "@electric-sql/pglite";
-import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
+import EmbeddedPostgres from "embedded-postgres";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
@@ -28,25 +27,44 @@ async function freePort() {
   return port;
 }
 async function main() {
-  const pg = new PGlite();
   const pgPort = await freePort();
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
-  const socket = new PGLiteSocketServer({
-    db: pg,
+  // Product editing loads product and category data concurrently, as in production.
+  // Use separate PostgreSQL sessions; PGlite's socket bridge shares unnamed statements.
+  const databasePassword = randomBytes(24).toString("hex");
+  const embedded = new EmbeddedPostgres({
+    databaseDir: await mkdtemp(join(tmpdir(), "woya-admin-db-")),
+    user: "postgres",
+    password: databasePassword,
     port: pgPort,
-    host: "127.0.0.1",
-    maxConnections: 4,
+    persistent: false,
+    authMethod: "scram-sha-256",
+    createPostgresUser: false,
+    postgresFlags: [
+      "-h",
+      "127.0.0.1",
+      "-c",
+      "unix_socket_directories=",
+      "-c",
+      "log_min_error_statement=panic",
+    ],
+    onLog: () => {},
+    onError: () => {},
   });
+  const pg = embedded.getPgClient("postgres", "127.0.0.1");
   const uploadDir = await mkdtemp(join(tmpdir(), "woya-admin-test-"));
   let child: ReturnType<typeof spawn> | undefined;
   let logs = "";
   try {
-    await pg.exec(await readFile("db/001-admin.sql", "utf8"));
-    await pg.exec(await readFile("db/002-admin-security.sql", "utf8"));
-    await pg.exec(await readFile("db/003-paytr.sql", "utf8"));
-    await pg.exec(await readFile("db/004-customer-accounts.sql", "utf8"));
-    await pg.exec(await readFile("db/005-commerce.sql", "utf8"));
+    await embedded.initialise();
+    await embedded.start();
+    await pg.connect();
+    await pg.query(await readFile("db/001-admin.sql", "utf8"));
+    await pg.query(await readFile("db/002-admin-security.sql", "utf8"));
+    await pg.query(await readFile("db/003-paytr.sql", "utf8"));
+    await pg.query(await readFile("db/004-customer-accounts.sql", "utf8"));
+    await pg.query(await readFile("db/005-commerce.sql", "utf8"));
     for (const c of initialCategories)
       await pg.query("INSERT INTO woya_categories(id,data) VALUES($1,$2)", [
         c.id,
@@ -73,7 +91,6 @@ async function main() {
         ),
       }),
     ]);
-    await socket.start();
     const password = randomBytes(18).toString("hex");
     const hash = await bcrypt.hash(password, 12);
     await pg.query(
@@ -93,7 +110,7 @@ async function main() {
       {
         env: {
           ...process.env,
-          DATABASE_URL: `postgres://postgres:postgres@127.0.0.1:${pgPort}/postgres`,
+          DATABASE_URL: `postgres://postgres:${databasePassword}@127.0.0.1:${pgPort}/postgres`,
           ADMIN_PASSWORD_HASH: hash,
           ADMIN_SESSION_SECRET: randomBytes(32).toString("hex"),
           APP_URL: base,
@@ -1355,14 +1372,14 @@ async function main() {
       }
     }
     check(limited, "Login rate limit enforced");
-    await pg.exec("DELETE FROM woya_products WHERE code='37'");
+    await pg.query("DELETE FROM woya_products WHERE code='37'");
     const setup = spawn(
       process.execPath,
       ["--import", "tsx", "scripts/admin-setup.ts"],
       {
         env: {
           ...process.env,
-          DATABASE_URL: `postgres://postgres:postgres@127.0.0.1:${pgPort}/postgres`,
+          DATABASE_URL: `postgres://postgres:${databasePassword}@127.0.0.1:${pgPort}/postgres`,
           ADMIN_PASSWORD_HASH: hash,
         },
         stdio: ["ignore", "pipe", "pipe"],
@@ -1406,10 +1423,8 @@ async function main() {
       child.kill("SIGTERM");
       await once(child, "exit");
     }
-    await socket.stop();
-    // The socket wrapper schedules asynchronous detach callbacks after stop resolves.
-    await new Promise((r) => setTimeout(r, 100));
-    await pg.close();
+    await pg.end();
+    await embedded.stop();
     await rm(uploadDir, { recursive: true, force: true });
   }
 }
