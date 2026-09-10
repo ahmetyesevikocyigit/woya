@@ -170,7 +170,7 @@ export default async function AdminPage({
     const stats = [
       { label: "Toplam ürün", value: summary.products, icon: Package },
       {
-        label: "Aktif ürün",
+        label: "Yayındaki ürün",
         value: summary.active,
         icon: CircleCheck,
       },

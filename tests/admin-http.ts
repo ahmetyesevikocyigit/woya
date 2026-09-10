@@ -619,7 +619,10 @@ async function main() {
     check(created.status === 200, "Product created");
     const id = createdData.id;
     const storedProduct = (
-      await pg.query("SELECT data FROM woya_products WHERE id=$1", [id])
+      await pg.query<{ data: { active: boolean; shippingIncluded: boolean } }>(
+        "SELECT data FROM woya_products WHERE id=$1",
+        [id],
+      )
     ).rows[0].data;
     check(
       storedProduct.active === true && storedProduct.shippingIncluded === true,
