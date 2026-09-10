@@ -1466,7 +1466,7 @@ async function main() {
       "Measurement migration preserves product count",
     );
     for (const previous of productsBeforeUpgrade) {
-      const current = upgradedRows.find((row) => row.id === previous.id)!;
+      const current = upgradedRows.find((row: {id: string}) => row.id === previous.id)!;
       const { measurementPricing: beforeMatrix, ...beforeData } = previous.data;
       const { measurementPricing: afterMatrix, ...afterData } = current.data;
       check(
