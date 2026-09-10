@@ -411,7 +411,8 @@ async function main() {
       await fetch(`${base}/admin/urunler/yeni`, { headers: { cookie } })
     ).text();
     check(
-      editorHtml.includes("Ölçü seçin") &&
+      editorHtml.includes("Tablo boyutu seçin") &&
+        editorHtml.includes("Saat boyutu seçin") &&
         editorHtml.includes("Henüz ölçü eklenmedi.") &&
         !editorHtml.includes('aria-label="Fiyat (₺)"'),
       "Admin starts with a size picker and opens price fields after selection",
@@ -1468,7 +1469,9 @@ async function main() {
       "Measurement migration preserves product count",
     );
     for (const previous of productsBeforeUpgrade) {
-      const current = upgradedRows.find((row: {id: string}) => row.id === previous.id)!;
+      const current = upgradedRows.find(
+        (row: { id: string }) => row.id === previous.id,
+      )!;
       const { measurementPricing: beforeMatrix, ...beforeData } = previous.data;
       const { measurementPricing: afterMatrix, ...afterData } = current.data;
       check(

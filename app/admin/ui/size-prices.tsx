@@ -38,6 +38,8 @@ export function SizePrices({
 }) {
   const id = useId();
   const [selected, setSelected] = useState("");
+  const [selectedPanel, setSelectedPanel] = useState("");
+  const [selectedClock, setSelectedClock] = useState("");
   const [price, setPrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
   const [error, setError] = useState("");
@@ -61,6 +63,20 @@ export function SizePrices({
   const displayed = choices.map(
     (row) => findSizePrice(rows, kind, row.clockShape, row.dimensions) ?? row,
   );
+  const panelKey = (row: SizePriceRow) =>
+    row.dimensions.panel.width + "x" + row.dimensions.panel.height;
+  const clockKey = (row: SizePriceRow) =>
+    row.clockShape +
+    ":" +
+    row.dimensions.clock.width +
+    "x" +
+    row.dimensions.clock.height;
+  const panelChoices = [
+    ...new Map(displayed.map((row) => [panelKey(row), row])).values(),
+  ];
+  const clockChoices = [
+    ...new Map(displayed.map((row) => [clockKey(row), row])).values(),
+  ];
   const added = displayed.filter((row) => row.price !== null);
   const choice = displayed.find((row) => keyOf(row) === selected);
   const editing = choice?.price !== null && choice?.price !== undefined;
@@ -70,17 +86,31 @@ export function SizePrices({
   }, [selected, Boolean(choice), onDraftChange]);
   function reset() {
     setSelected("");
+    setSelectedPanel("");
+    setSelectedClock("");
     setPrice("");
     setSalePrice("");
     setError("");
   }
-  function select(key: string) {
+  function select(key: string, updateParts = true) {
     const row = displayed.find((row) => keyOf(row) === key);
     setSelected(key);
+    if (updateParts && kind === "set") {
+      setSelectedPanel(row ? panelKey(row) : "");
+      setSelectedClock(row ? clockKey(row) : "");
+    }
     setPrice(row?.price?.toString() ?? "");
     setSalePrice(row?.salePrice?.toString() ?? "");
     setError("");
     setNotice("");
+  }
+  function selectPair(panel: string, clock: string) {
+    setSelectedPanel(panel);
+    setSelectedClock(clock);
+    const row = displayed.find(
+      (row) => panelKey(row) === panel && clockKey(row) === clock,
+    );
+    select(row ? keyOf(row) : "", false);
   }
   function commit() {
     if (!choice) return;
@@ -125,27 +155,65 @@ export function SizePrices({
             : "Saat ölçü fiyatları"
       }
     >
-      <label className={styles.selector}>
-        Ölçü seç
-        <select
-          value={choice ? selected : ""}
-          onChange={(e) => select(e.target.value)}
-          aria-controls={id + "-editor"}
-        >
-          <option value="">Ölçü seçin</option>
-          {displayed.map((row) => (
-            <option key={keyOf(row)} value={keyOf(row)}>
-              {labelOf(row)}
-              {row.price !== null ? " · Eklendi" : ""}
-            </option>
-          ))}
-        </select>
-      </label>
+      {kind === "set" ? (
+        <div className={styles.selectors}>
+          <label className={styles.selector}>
+            Tablo boyutu
+            <select
+              value={selectedPanel}
+              onChange={(e) => selectPair(e.target.value, selectedClock)}
+              aria-controls={id + "-editor"}
+            >
+              <option value="">Tablo boyutu seçin</option>
+              {panelChoices.map((row) => (
+                <option key={panelKey(row)} value={panelKey(row)}>
+                  {dimensionLabel(row.dimensions.panel)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.selector}>
+            Saat boyutu
+            <select
+              value={selectedClock}
+              onChange={(e) => selectPair(selectedPanel, e.target.value)}
+              aria-controls={id + "-editor"}
+            >
+              <option value="">Saat boyutu seçin</option>
+              {clockChoices.map((row) => (
+                <option key={clockKey(row)} value={clockKey(row)}>
+                  {dimensionLabel(
+                    row.dimensions.clock,
+                    row.clockShape === "circle",
+                  )}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : (
+        <label className={styles.selector}>
+          Ölçü seç
+          <select
+            value={choice ? selected : ""}
+            onChange={(e) => select(e.target.value)}
+            aria-controls={id + "-editor"}
+          >
+            <option value="">Ölçü seçin</option>
+            {displayed.map((row) => (
+              <option key={keyOf(row)} value={keyOf(row)}>
+                {labelOf(row)}
+                {row.price !== null ? " · Eklendi" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {choice && (
         <div className={styles.editor} id={id + "-editor"}>
           <div className={styles.fields}>
             <label>
-              Toplam fiyat (₺)
+              {kind === "set" ? "Toplam set fiyatı (₺)" : "Toplam fiyat (₺)"}
               <input
                 aria-label="Fiyat (₺)"
                 type="number"
