@@ -3,8 +3,8 @@
   gap: 36px;
 }
 
-.studio :global(.product-mixer-header) { max-width: 700px; }
-.studio :global(.product-mixer-header h2) { font-size: 2rem; line-height: 1.22; font-weight: 550; }
+.studio :global(.product-mixer-header) { max-width: 820px; padding: 22px 30px; border: 1px solid var(--gold); box-sizing: border-box; }
+.studio :global(.product-mixer-header h2) { font-size: 2.25rem; line-height: 1.22; font-weight: 550; }
 .studio :global(.product-mixer-inner) {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
@@ -99,7 +99,8 @@
 
 @media (max-width: 960px) {
   .studio { padding: 40px 20px; gap: 24px; }
-  .studio :global(.product-mixer-header h2) { font-size: 1.65rem; }
+  .studio :global(.product-mixer-header) { max-width: 100%; padding: 18px 22px; }
+  .studio :global(.product-mixer-header h2) { font-size: 1.85rem; }
   .studio :global(.product-mixer-inner) { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "stage" "options" "order"; gap: 24px; }
   .studio :global(.product-mixer-panel) { padding: 0; border: 0; gap: 18px; }
   .studio :global(.product-mixer-canvas) { height: 320px; padding: 24px; }
@@ -120,7 +121,8 @@
 }
 
 @media (max-width: 480px) {
-  .studio :global(.product-mixer-header h2) { font-size: 1.45rem; }
+  .studio :global(.product-mixer-header) { padding: 16px 18px; }
+  .studio :global(.product-mixer-header h2) { font-size: 1.65rem; }
   .studio :global(.product-mixer-canvas) { height: 238px; padding: 22px 4px; }
   .studio :global(.mixer-live-set) { gap: 14px; }
   .studio :global(.mixer-clock-preview), .studio :global(.mixer-clock-preview[data-size]) { max-width: 195px; }
