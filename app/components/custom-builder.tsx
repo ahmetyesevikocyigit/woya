@@ -568,9 +568,7 @@ function AvailableBuilder({
 
         <div className="builder-stage-column product-mixer-stage-column">
           <div className={styles.stageToolbar}>
-            <h3>
-              {mode === "set" ? "Sizin kompozisyonunuz" : selectedClock.name}
-            </h3>
+            {mode === "clock" && <h3>{selectedClock.name}</h3>}
             <button
               className="mixer-icon-button"
               type="button"

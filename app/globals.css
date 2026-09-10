@@ -235,7 +235,7 @@ img {
   color: rgba(255, 255, 255, 0.9);
   display: inline-flex;
   font-size: 0.83rem;
-  font-weight: 760;
+  font-weight: 400;
   min-height: 34px;
   position: relative;
   text-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
@@ -589,7 +589,7 @@ img {
 .mobile-menu-panel a {
   color: rgba(255, 255, 255, 0.88);
   font-size: 0.82rem;
-  font-weight: 720;
+  font-weight: 400;
   min-height: 42px;
   padding: 12px 14px;
   transition:
