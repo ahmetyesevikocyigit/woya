@@ -31,6 +31,7 @@ async function readProducts(id?: string): Promise<ProductRecord[]> {
     : await db()`SELECT * FROM woya_products ORDER BY created_at DESC, code`;
   return rows.map((r) => ({
     ...r.data,
+    shippingIncluded: r.data.shippingIncluded === true,
     id: r.id,
     code: r.code,
     version: r.version,

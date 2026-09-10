@@ -250,6 +250,76 @@ async function main() {
       "https://evil.test",
     );
     check(disabledOrigin.status === 403, "Cross-origin checkout is rejected");
+    const beforeShipping = await quote();
+    await pg.query(
+      "UPDATE woya_products SET data=jsonb_set(data,'{shippingIncluded}','true') WHERE id=$1",
+      [productId],
+    );
+    const includedQuote = await quote();
+    check(
+      includedQuote.shipping === 0 &&
+        includedQuote.total === 125000 &&
+        includedQuote.items[0].shippingIncluded === true,
+      "Server quote respects product-included shipping",
+    );
+    check(
+      includedQuote.hash !== beforeShipping.hash,
+      "Shipping setting changes invalidate the prior quote",
+    );
+    const staleShipping = await api("/api/odeme/baslat", {
+      requestId: randomUUID(),
+      quoteHash: beforeShipping.hash,
+      items: [item],
+      customer,
+      note: "",
+      consent: true,
+    });
+    check(
+      staleShipping.status === 409,
+      "Payment rejects stale shipping quote before contacting PayTR",
+    );
+    check(
+      (
+        await api("/api/odeme/ozet", {
+          items: [{ ...item, shippingIncluded: true }],
+        })
+      ).status === 400,
+      "Client cannot forge included shipping",
+    );
+    const otherId = randomUUID();
+    const other = {
+      ...product,
+      slug: "shipping-excluded",
+      price: 500,
+      salePrice: null,
+      shippingIncluded: false,
+      active: true,
+    };
+    await pg.query(
+      "INSERT INTO woya_products(id,slug,code,category_id,data) VALUES($1,$2,$3,$4,$5)",
+      [
+        otherId,
+        other.slug,
+        "shipping-other",
+        other.categoryId,
+        JSON.stringify(other),
+      ],
+    );
+    const mixed = await quote([item, { ...item, slug: other.slug }]);
+    check(
+      mixed.shipping === 10000 && mixed.total === 185000,
+      "Mixed baskets charge shipping once for excluded products",
+    );
+    check(
+      (await quote([item, { ...item, slug: other.slug, quantity: 2 }]))
+        .shipping === 0,
+      "Mixed basket still gets threshold free shipping",
+    );
+    await pg.query("DELETE FROM woya_products WHERE id=$1", [otherId]);
+    await pg.query(
+      "UPDATE woya_products SET data=jsonb_set(data,'{shippingIncluded}','false') WHERE id=$1",
+      [productId],
+    );
     const q = await quote();
     check(
       q.total === 135000 && q.subtotal === 125000 && q.shipping === 10000,

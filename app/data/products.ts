@@ -1,5 +1,6 @@
 export type WoyaProduct = {
   builderParts?: import("@/lib/builder-catalog").BuilderAssets;
+  shippingIncluded?: boolean;
   code: string;
   title: string;
   text: string;

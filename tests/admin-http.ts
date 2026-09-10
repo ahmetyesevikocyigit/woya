@@ -601,10 +601,46 @@ async function main() {
       ).status === 409,
       "Category in use cannot be deleted",
     );
-    const created = await api("/api/admin/products", { data: product });
+    for (const patch of [
+      { price: null },
+      { title: "   " },
+      { description: "   " },
+    ]) {
+      check(
+        (await api("/api/admin/products", { data: { ...product, ...patch } }))
+          .status === 400,
+        "Product API rejects missing required fields",
+      );
+    }
+    const created = await api("/api/admin/products", {
+      data: { ...product, active: false, shippingIncluded: true },
+    });
     const createdData = await created.json();
     check(created.status === 200, "Product created");
     const id = createdData.id;
+    const storedProduct = (
+      await pg.query("SELECT data FROM woya_products WHERE id=$1", [id])
+    ).rows[0].data;
+    check(
+      storedProduct.active === true && storedProduct.shippingIncluded === true,
+      "Product save publishes automatically and persists shipping choice",
+    );
+    for (const patch of [
+      { price: null },
+      { title: "   " },
+      { description: "   " },
+    ]) {
+      check(
+        (
+          await api("/api/admin/products", {
+            id,
+            version: 1,
+            data: { ...product, ...patch },
+          })
+        ).status === 400,
+        "Product edit cannot erase required fields",
+      );
+    }
     check(
       (await api("/api/admin/products", { data: product })).status === 409,
       "Duplicate slug rejected",
@@ -673,6 +709,33 @@ async function main() {
     );
     await pg.query(
       "UPDATE woya_products SET data=jsonb_set(jsonb_set(data,'{active}','true'),'{stock}','0') WHERE id=$1",
+      [id],
+    );
+    await pg.query(
+      "UPDATE woya_products SET data=jsonb_set(jsonb_set(data,'{price}','null'),'{salePrice}','null') WHERE id=$1",
+      [id],
+    );
+    const missingPrice = await (
+      await api("/api/sepet/fiyat", {
+        items: [
+          {
+            slug: product.slug,
+            quantity: 1,
+            configuration: {
+              source: "product",
+              dimensions: defaultDimensions(pricing, "rectangle"),
+              pricingMode: "standard",
+            },
+          },
+        ],
+      })
+    ).json();
+    check(
+      missingPrice.quotes[0].price === null,
+      "Legacy missing prices are not replaced with invented catalogue prices",
+    );
+    await pg.query(
+      "UPDATE woya_products SET data=jsonb_set(jsonb_set(data,'{price}','1500'),'{salePrice}','1250') WHERE id=$1",
       [id],
     );
     const legacyStockQuote = await (

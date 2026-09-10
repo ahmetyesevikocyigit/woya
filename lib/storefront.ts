@@ -2,11 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { getStorefrontCatalog, readCatalog } from "./admin/repository";
 import { clockShapeFor } from "./pricing";
-import {
-  defaultCatalogProductPrice,
-  woyaProducts,
-  type WoyaProduct,
-} from "../app/data/products";
+import { woyaProducts, type WoyaProduct } from "../app/data/products";
 import type { BuilderParts } from "./admin/schema";
 
 function publicBuilderParts(parts?: BuilderParts) {
@@ -27,11 +23,14 @@ function storefrontPrice(product: {
   type?: "set" | "saat" | "tablo" | "rehber";
 }) {
   if (product.type === "rehber") return { price: null, salePrice: null };
-  const price = positivePrice(product.price) ?? defaultCatalogProductPrice;
+  const price = positivePrice(product.price);
   const salePrice = positivePrice(product.salePrice);
   return {
     price,
-    salePrice: salePrice !== null && salePrice < price ? salePrice : null,
+    salePrice:
+      price !== null && salePrice !== null && salePrice < price
+        ? salePrice
+        : null,
   };
 }
 
@@ -80,6 +79,7 @@ export const storefrontProducts = cache(async function storefrontProducts(
           ...(original?.details.filter((d) => d.label !== "Ürün tipi") ?? []),
         ],
         images: p.images,
+        shippingIncluded: p.shippingIncluded === true,
         price: price.price,
         salePrice: price.salePrice,
         productType: p.type,
@@ -108,6 +108,7 @@ export async function storefrontQuoteData() {
           title: p.title,
           productType: p.type,
           clockShape: clockShapeFor(p),
+          shippingIncluded: p.shippingIncluded === true,
           price: price.price,
           salePrice: price.salePrice,
           builderParts: publicBuilderParts(p.builderParts),

@@ -198,3 +198,37 @@ test("Outbox survives transport failure, provider ambiguity and a worker crash w
     delete process.env.CUSTOMER_EMAIL_API_KEY;
   }
 });
+
+test("Included shipping waives the fee only for fully included baskets or the existing threshold", () => {
+  const settings = storeSettingsSchema.parse({
+    shippingFee: 5500,
+    freeShippingThreshold: 200000,
+  });
+  assert.equal(
+    configuredShipping(50000, settings, [{ shippingIncluded: true }]),
+    0,
+  );
+  assert.equal(
+    configuredShipping(150000, settings, [
+      { shippingIncluded: true },
+      { shippingIncluded: true },
+    ]),
+    0,
+  );
+  assert.equal(
+    configuredShipping(150000, settings, [
+      { shippingIncluded: true },
+      { shippingIncluded: false },
+    ]),
+    5500,
+  );
+  assert.equal(configuredShipping(150000, settings, [{}]), 5500);
+  assert.equal(
+    configuredShipping(200000, settings, [
+      { shippingIncluded: true },
+      { shippingIncluded: false },
+    ]),
+    0,
+  );
+  assert.equal(configuredShipping(150000, settings, []), 5500);
+});

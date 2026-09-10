@@ -52,14 +52,20 @@ export async function checkoutQuote(
           ? "Kişiye özel tablo ve saat seti"
           : "Kişiye özel saat"
         : products.find((p) => p.slug === item.slug)!.title;
-    return { ...item, title, unitPrice, options: quote.options };
+    return {
+      ...item,
+      title,
+      unitPrice,
+      shippingIncluded: quote.shippingIncluded === true,
+      options: quote.options,
+    };
   });
   const subtotal = lines.reduce(
     (sum, item) => sum + toKurus(item.unitPrice) * item.quantity,
     0,
   );
   const store = await checkoutSettings();
-  const shipping = configuredShipping(subtotal, store)!;
+  const shipping = configuredShipping(subtotal, store, lines)!;
   const total = toKurus((subtotal + shipping) / 100);
   const data = {
     items: lines,

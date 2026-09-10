@@ -65,7 +65,13 @@ export function deliveryAnnouncement(
   const days = deliveryBusinessDays(s);
   return days === null ? "Özenle hazırlanır" : `${days} iş gününde teslimat`;
 }
-export function configuredShipping(subtotal: number, s: StoreSettings) {
+export function configuredShipping(
+  subtotal: number,
+  s: StoreSettings,
+  items?: ReadonlyArray<{ shippingIncluded?: boolean }>,
+) {
+  if (items?.length && items.every((item) => item.shippingIncluded === true))
+    return 0;
   if (s.shippingFee === null) return null;
   return s.freeShippingThreshold !== null && subtotal >= s.freeShippingThreshold
     ? 0

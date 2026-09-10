@@ -17,7 +17,7 @@ import {
   categorySchema,
   contentSchema,
   orderUpdateSchema,
-  productSchema,
+  productSaveSchema,
   versionSchema,
 } from "@/lib/admin/schema";
 
@@ -37,7 +37,14 @@ export async function POST(request: Request, context: Context) {
     const id = body.id || randomUUID();
     await db().begin(async (tx) => {
       if (resource === "products") {
-        const data = productSchema.parse(body.data);
+        const data = productSaveSchema.parse(body.data);
+        const [category] =
+          await tx`SELECT data FROM woya_categories WHERE id=${data.categoryId}`;
+        if (category && !category.data.active)
+          throw new HttpError(
+            400,
+            "Ürünü yayınlamak için aktif bir kategori seçin.",
+          );
         if (body.id) {
           const version = versionSchema.parse(body.version);
           const rows =

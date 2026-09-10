@@ -10,6 +10,7 @@ import {
   imageUrl,
   inquirySchema,
   productSchema,
+  productSaveSchema,
   safeLink,
 } from "../lib/admin/schema";
 import {
@@ -180,5 +181,36 @@ test("Password change validates confirmation and bcrypt byte limits without trim
   assert.equal(
     passwordChangeSchema.parse(spaces).newPassword,
     spaces.newPassword,
+  );
+});
+
+test("Product saves require real title, description and price and always publish", () => {
+  const product = {
+    ...initialProducts()[1],
+    price: 700,
+    salePrice: null,
+    active: false,
+  };
+  for (const invalid of [
+    { title: "   " },
+    { description: "   " },
+    { price: null },
+    { price: undefined },
+    { price: 0 },
+    { shippingIncluded: "true" },
+  ]) {
+    assert.equal(
+      productSaveSchema.safeParse({ ...product, ...invalid }).success,
+      false,
+    );
+  }
+  const saved = productSaveSchema.parse({ ...product, shippingIncluded: true });
+  assert.equal(saved.active, true);
+  assert.equal(saved.shippingIncluded, true);
+  assert.equal(productSaveSchema.parse(product).shippingIncluded, false);
+  assert.equal(
+    productSchema.safeParse({ ...product, price: null }).success,
+    true,
+    "Legacy records remain readable",
   );
 });

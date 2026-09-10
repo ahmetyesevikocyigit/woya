@@ -72,6 +72,7 @@ export type CheckoutQuote = {
   items: (CheckoutItem & {
     title: string;
     unitPrice: number;
+    shippingIncluded?: boolean;
     options: string[];
   })[];
   subtotal: number;

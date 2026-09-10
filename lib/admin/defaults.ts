@@ -64,6 +64,7 @@ export const initialProducts = (): ProductRecord[] =>
     price: p.price ?? null,
     salePrice: p.salePrice ?? null,
     stock: p.stock ?? null,
+    shippingIncluded: p.shippingIncluded ?? false,
     type:
       p.productType ??
       (p.collection === "rehber"

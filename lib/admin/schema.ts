@@ -51,16 +51,25 @@ export const builderPartsSchema = z
 export type BuilderParts = z.infer<typeof builderPartsSchema>;
 export const productSchema = z
   .object({
-    title: z.string().trim().min(3).max(180),
+    title: z
+      .string()
+      .trim()
+      .min(3, "Ürün adı en az 3 karakter olmalı.")
+      .max(180),
     slug: slugSchema,
     categoryId: slugSchema,
-    description: z.string().trim().min(10).max(10000),
+    description: z
+      .string()
+      .trim()
+      .min(10, "Açıklama en az 10 karakter olmalı.")
+      .max(10000),
     price: z.number().min(0.01).max(10000000).nullable(),
     salePrice: z.number().min(0.01).max(10000000).nullable(),
     stock: z.number().int().min(0).max(1000000).nullable(),
     type: z.enum(["set", "saat", "tablo", "rehber"]),
     clockShape: z.enum(["rectangle", "circle"]).optional(),
-    active: z.boolean(),
+    active: z.boolean().default(true),
+    shippingIncluded: z.boolean().default(false),
     featured: z.boolean(),
     images: z.array(imageSchema).min(1).max(12),
     builderParts: builderPartsSchema.optional(),
@@ -84,6 +93,13 @@ export const productSchema = z
       path: ["salePrice"],
     },
   );
+// Legacy records can still be read with a missing price; every admin save must supply one.
+export const productSaveSchema = productSchema
+  .refine((value) => value.price !== null, {
+    message: "Ürün fiyatı zorunludur.",
+    path: ["price"],
+  })
+  .transform((value) => ({ ...value, active: true }));
 export type ProductInput = z.infer<typeof productSchema>;
 export type ProductRecord = ProductInput & {
   id: string;

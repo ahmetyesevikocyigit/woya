@@ -4,21 +4,41 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Plus, Pencil, Trash2, Search, Crop } from "lucide-react";
-import type { Category, ProductInput, ProductRecord } from "@/lib/admin/schema";
+import {
+  productSaveSchema,
+  type Category,
+  type ProductInput,
+  type ProductRecord,
+} from "@/lib/admin/schema";
 import { ImageEditor } from "./images";
 import { Empty, FormEnd, money, useSave } from "./shared";
-const PartCropEditor = dynamic(() => import("./part-crop-editor"), { loading: () => <p role="status">Kırpma aracı yükleniyor…</p> });
+const PartCropEditor = dynamic(() => import("./part-crop-editor"), {
+  loading: () => <p role="status">Kırpma aracı yükleniyor…</p>,
+});
 
 export function ProductsTable({
   products,
   categories,
 }: {
-  products: Pick<ProductRecord, "id" | "code" | "slug" | "title" | "categoryId" | "active" | "featured" | "type" | "price" | "salePrice" | "images">[];
+  products: Pick<
+    ProductRecord,
+    | "id"
+    | "code"
+    | "slug"
+    | "title"
+    | "categoryId"
+    | "shippingIncluded"
+    | "featured"
+    | "type"
+    | "price"
+    | "salePrice"
+    | "images"
+  >[];
   categories: Category[];
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
-  const [status, setStatus] = useState("");
+  const [featuredOnly, setFeaturedOnly] = useState(false);
   const [page, setPage] = useState(1);
   const filtered = products.filter(
     (p) =>
@@ -26,12 +46,7 @@ export function ProductsTable({
         .toLocaleLowerCase("tr")
         .includes(query.toLocaleLowerCase("tr")) &&
       (!category || p.categoryId === category) &&
-      (!status ||
-        (status === "active"
-          ? p.active
-          : status === "inactive"
-            ? !p.active
-            : p.featured)),
+      (!featuredOnly || p.featured),
   );
   const pages = Math.max(1, Math.ceil(filtered.length / 20));
   const current = Math.min(page, pages);
@@ -67,16 +82,14 @@ export function ProductsTable({
           ))}
         </select>
         <select
-          aria-label="Durum filtresi"
-          value={status}
+          aria-label="Öne çıkan ürün filtresi"
+          value={featuredOnly ? "featured" : ""}
           onChange={(e) => {
-            setStatus(e.target.value);
+            setFeaturedOnly(e.target.value === "featured");
             setPage(1);
           }}
         >
-          <option value="">Tüm durumlar</option>
-          <option value="active">Aktif</option>
-          <option value="inactive">Pasif</option>
+          <option value="">Tüm ürünler</option>
           <option value="featured">Öne çıkan</option>
         </select>
         <Link className="admin-primary" href="/admin/urunler/yeni">
@@ -91,7 +104,7 @@ export function ProductsTable({
               <th>Ürün</th>
               <th>Kategori</th>
               <th>Fiyat</th>
-              <th>Durum</th>
+              <th>Kargo</th>
               <th>
                 <span className="sr-only">İşlem</span>
               </th>
@@ -105,7 +118,13 @@ export function ProductsTable({
                     className="admin-product-cell"
                     href={`/admin/urunler/${p.id}`}
                   >
-                    <Image src={p.images[0].url} alt="" width={44} height={54} sizes="44px" />
+                    <Image
+                      src={p.images[0].url}
+                      alt=""
+                      width={44}
+                      height={54}
+                      sizes="44px"
+                    />
                     <span>
                       <strong>{p.title}</strong>
                       <small>
@@ -116,14 +135,8 @@ export function ProductsTable({
                   </Link>
                 </td>
                 <td>{categories.find((c) => c.id === p.categoryId)?.title}</td>
-                <td>
-                  {money(p.salePrice ?? p.price)}
-                </td>
-                <td>
-                  <span className="admin-status" data-active={p.active}>
-                    {p.active ? "Aktif" : "Pasif"}
-                  </span>
-                </td>
+                <td>{money(p.salePrice ?? p.price)}</td>
+                <td>{p.shippingIncluded ? "Kargo dahil" : "Kargo hariç"}</td>
                 <td>
                   <Link
                     title="Ürünü düzenle"
@@ -166,7 +179,8 @@ const newProduct: ProductInput = {
   salePrice: null,
   stock: null,
   type: "set",
-  active: false,
+  active: true,
+  shippingIncluded: false,
   featured: false,
   images: [],
 };
@@ -191,6 +205,7 @@ export function ProductForm({
   const [value, setValue] = useState<ProductInput>(product ?? newProduct);
   const [cropping, setCropping] = useState(false);
   const { busy, error, save } = useSave();
+  const [validationError, setValidationError] = useState("");
   function field<K extends keyof ProductInput>(name: K, next: ProductInput[K]) {
     setValue((v) => ({ ...v, [name]: next }));
   }
@@ -199,10 +214,24 @@ export function ProductForm({
       className="admin-form"
       onSubmit={(e) => {
         e.preventDefault();
-        if (cropping) return;
+        if (cropping || busy) return;
+        const parsed = productSaveSchema.safeParse(value);
+        if (!parsed.success) {
+          setValidationError(
+            parsed.error.issues.map((issue) => issue.message).join("\n"),
+          );
+          return;
+        }
+        setValidationError("");
+        if (
+          !window.confirm(
+            "Değişiklikleri kaydetmek istediğinize emin misiniz? Ürün kaydedildiğinde doğrudan yayınlanacak.",
+          )
+        )
+          return;
         void save(
           "products",
-          { id: product?.id, version: product?.version, data: value },
+          { id: product?.id, version: product?.version, data: parsed.data },
           "/admin/urunler",
         );
       }}
@@ -211,9 +240,10 @@ export function ProductForm({
         <div>
           <h2>Ürün Bilgileri</h2>
           <label>
-            Ürün başlığı
+            Ürün adı
             <input
               required
+              minLength={3}
               maxLength={180}
               value={value.title}
               onChange={(e) => {
@@ -257,12 +287,13 @@ export function ProductForm({
                 value={value.categoryId}
                 onChange={(e) => field("categoryId", e.target.value)}
               >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title}
-                    {c.active ? "" : " (pasif)"}
-                  </option>
-                ))}
+                {categories
+                  .filter((c) => c.active)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                    </option>
+                  ))}
               </select>
             </label>
             <label>
@@ -271,7 +302,13 @@ export function ProductForm({
                 value={value.type}
                 disabled={cropping}
                 onChange={(e) =>
-                  setValue((v) => ({ ...v, type: e.target.value as ProductInput["type"], builderParts: v.builderParts ? { ...v.builderParts, enabled: false } : undefined }))
+                  setValue((v) => ({
+                    ...v,
+                    type: e.target.value as ProductInput["type"],
+                    builderParts: v.builderParts
+                      ? { ...v.builderParts, enabled: false }
+                      : undefined,
+                  }))
                 }
               >
                 <option value="set">Tablo ve saat seti</option>
@@ -307,36 +344,46 @@ export function ProductForm({
                 ["price", "Fiyat (₺)"],
                 ["salePrice", "İndirimli fiyat (₺)"],
               ] as const
-            )
-              .map(([name, label]) => (
-                <label key={name}>
-                  {label}
-                  <input
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    placeholder="Belirtilmedi"
-                    value={value[name] ?? ""}
-                    onChange={(e) =>
-                      field(
-                        name,
-                        e.target.value === "" ? null : Number(e.target.value),
-                      )
-                    }
-                  />
-                </label>
-              ))}
+            ).map(([name, label]) => (
+              <label key={name}>
+                {label}
+                <input
+                  type="number"
+                  required={name === "price"}
+                  max={10000000}
+                  min={0.01}
+                  step={0.01}
+                  placeholder={name === "price" ? "Zorunlu" : "İsteğe bağlı"}
+                  value={value[name] ?? ""}
+                  onChange={(e) =>
+                    field(
+                      name,
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
+                />
+              </label>
+            ))}
           </div>
-          {value.type !== "rehber" && <Link className="admin-inline-link" href="/admin/fiyatlandirma">Özel ölçü m² fiyatlarını düzenle</Link>}
-          <h2>Yayın</h2>
-          <label className="admin-check">
-            <input
-              type="checkbox"
-              checked={value.active}
-              onChange={(e) => field("active", e.target.checked)}
-            />
-            Mağazada aktif
+          {value.type !== "rehber" && (
+            <Link className="admin-inline-link" href="/admin/fiyatlandirma">
+              Özel ölçü m² fiyatlarını düzenle
+            </Link>
+          )}
+          <label>
+            Kargo
+            <select
+              value={value.shippingIncluded ? "included" : "excluded"}
+              onChange={(e) =>
+                field("shippingIncluded", e.target.value === "included")
+              }
+            >
+              <option value="excluded">Kargo hariç</option>
+              <option value="included">Kargo dahil</option>
+            </select>
           </label>
+          <h2>Görünürlük</h2>
+          <p>Kaydettiğiniz ürün doğrudan yayınlanır.</p>
           <label className="admin-check">
             <input
               type="checkbox"
@@ -353,7 +400,7 @@ export function ProductForm({
                 onClick={() => {
                   if (
                     window.confirm(
-                      "Ürün kalıcı olarak silinsin mi? Geçmiş sipariş kayıtları korunur. Mağazadan gizlemek için pasife alabilirsiniz.",
+                      "Ürün kalıcı olarak silinsin mi? Geçmiş sipariş kayıtları korunur.",
                     )
                   )
                     void save(
@@ -378,21 +425,91 @@ export function ProductForm({
           />
         </aside>
       </div>
-      {(value.type === "set" || value.type === "saat") && <section>
-        {!cropping && <>
-          <h2>Kendin Oluştur Parçaları</h2>
-          {value.builderParts && <>
-            <label className="admin-check"><input type="checkbox" checked={value.builderParts.enabled} onChange={(e) => field("builderParts", { ...value.builderParts!, enabled: e.target.checked })} />Kendin Oluştur’da göster</label>
-            <div className="admin-image-strip">{(["left", "center", "right"] as const).map((part) => value.builderParts?.[part] && <Image key={part} src={value.builderParts[part]!} alt={part === "left" ? "Sol tablo" : part === "right" ? "Sağ tablo" : "Saat"} width={80} height={100} sizes="80px" style={{ objectFit: "contain" }} />)}</div>
-          </>}
-          <button type="button" disabled={busy} onClick={() => setCropping(true)}><Crop size={17} />{value.builderParts ? "Parçaları düzenle" : "Fotoğraftan parçaları hazırla"}</button>
-        </>}
-        {cropping && <PartCropEditor initial={value.builderParts} sourceImage={value.images[0]?.url} set={value.type === "set"} onCancel={() => setCropping(false)} onApply={(parts) => {
-          setValue((v) => ({ ...v, builderParts: parts, clockShape: parts.regions.center.mask === "ellipse" ? "circle" : "rectangle", images: v.images.length ? v.images : [{ url: parts.source, alt: v.title, x: 50, y: 50 }] }));
-          setCropping(false);
-        }} />}
-      </section>}
-      <FormEnd busy={busy} disabled={cropping} error={error} />
+      {(value.type === "set" || value.type === "saat") && (
+        <section>
+          {!cropping && (
+            <>
+              <h2>Kendin Oluştur Parçaları</h2>
+              {value.builderParts && (
+                <>
+                  <label className="admin-check">
+                    <input
+                      type="checkbox"
+                      checked={value.builderParts.enabled}
+                      onChange={(e) =>
+                        field("builderParts", {
+                          ...value.builderParts!,
+                          enabled: e.target.checked,
+                        })
+                      }
+                    />
+                    Kendin Oluştur’da göster
+                  </label>
+                  <div className="admin-image-strip">
+                    {(["left", "center", "right"] as const).map(
+                      (part) =>
+                        value.builderParts?.[part] && (
+                          <Image
+                            key={part}
+                            src={value.builderParts[part]!}
+                            alt={
+                              part === "left"
+                                ? "Sol tablo"
+                                : part === "right"
+                                  ? "Sağ tablo"
+                                  : "Saat"
+                            }
+                            width={80}
+                            height={100}
+                            sizes="80px"
+                            style={{ objectFit: "contain" }}
+                          />
+                        ),
+                    )}
+                  </div>
+                </>
+              )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setCropping(true)}
+              >
+                <Crop size={17} />
+                {value.builderParts
+                  ? "Parçaları düzenle"
+                  : "Fotoğraftan parçaları hazırla"}
+              </button>
+            </>
+          )}
+          {cropping && (
+            <PartCropEditor
+              initial={value.builderParts}
+              sourceImage={value.images[0]?.url}
+              set={value.type === "set"}
+              onCancel={() => setCropping(false)}
+              onApply={(parts) => {
+                setValue((v) => ({
+                  ...v,
+                  builderParts: parts,
+                  clockShape:
+                    parts.regions.center.mask === "ellipse"
+                      ? "circle"
+                      : "rectangle",
+                  images: v.images.length
+                    ? v.images
+                    : [{ url: parts.source, alt: v.title, x: 50, y: 50 }],
+                }));
+                setCropping(false);
+              }}
+            />
+          )}
+        </section>
+      )}
+      <FormEnd
+        busy={busy}
+        disabled={cropping}
+        error={validationError || error}
+      />
     </form>
   );
 }

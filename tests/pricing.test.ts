@@ -260,49 +260,250 @@ test("Builder quote validates available sources, clock shape, quantities and set
   );
 });
 test("Legacy inventory does not block published products; missing products and invalid quantities still fail", () => {
-  const item = { slug: "tablo", quantity: 99, configuration: { source: "product", dimensions, pricingMode: "custom" } };
-  assert.equal(quoteItem(item, products.map((p) => ({ ...p, stock: 0 })), settings).price, 700);
+  const item = {
+    slug: "tablo",
+    quantity: 99,
+    configuration: { source: "product", dimensions, pricingMode: "custom" },
+  };
+  assert.equal(
+    quoteItem(
+      item,
+      products.map((p) => ({ ...p, stock: 0 })),
+      settings,
+    ).price,
+    700,
+  );
   assert.equal(quoteItem(item, [], settings).price, null);
-  assert.equal(quoteItem({ ...item, quantity: 100 }, products, settings).price, null);
+  assert.equal(
+    quoteItem({ ...item, quantity: 100 }, products, settings).price,
+    null,
+  );
 });
 
 test("Standard products use seller prices and discounts, without any m² rates", () => {
   for (const kind of ["tablo", "saat", "set"] as const) {
     for (const shape of ["rectangle", "circle"] as const) {
-      assert.equal(calculateSelectionPrice(kind, dimensions, shape, initialPricing, { price: 1500 }, "standard").price, 1500);
-      assert.equal(calculateSelectionPrice(kind, dimensions, shape, settings, { price: 1500, salePrice: 1250 }, "standard").price, 1250);
+      assert.equal(
+        calculateSelectionPrice(
+          kind,
+          dimensions,
+          shape,
+          initialPricing,
+          { price: 1500 },
+          "standard",
+        ).price,
+        1500,
+      );
+      assert.equal(
+        calculateSelectionPrice(
+          kind,
+          dimensions,
+          shape,
+          settings,
+          { price: 1500, salePrice: 1250 },
+          "standard",
+        ).price,
+        1250,
+      );
     }
   }
-  assert.equal(calculateSelectionPrice("set", dimensions, "rectangle", settings, { price: null }, "standard").price, null);
-  assert.equal(calculateSelectionPrice("set", dimensions, "rectangle", initialPricing, { price: 1500 }, "custom").price, null);
+  assert.equal(
+    calculateSelectionPrice(
+      "set",
+      dimensions,
+      "rectangle",
+      settings,
+      { price: null },
+      "standard",
+    ).price,
+    null,
+  );
+  assert.equal(
+    calculateSelectionPrice(
+      "set",
+      dimensions,
+      "rectangle",
+      initialPricing,
+      { price: 1500 },
+      "custom",
+    ).price,
+    null,
+  );
 });
 
 test("Choosing custom at preset dimensions changes pricing and cart identity", () => {
   const product = { price: 5000, salePrice: 4500 };
-  assert.equal(calculateSelectionPrice("set", dimensions, "rectangle", settings, product, "standard").price, 4500);
-  assert.equal(calculateSelectionPrice("set", dimensions, "rectangle", settings, product, "custom").price, 2480);
-  const item = { slug: "set", configuration: { source: "product", dimensions, pricingMode: "standard" } as Configuration };
-  assert.notEqual(cartKey(item), cartKey({ ...item, configuration: { ...item.configuration, pricingMode: "custom" } }));
+  assert.equal(
+    calculateSelectionPrice(
+      "set",
+      dimensions,
+      "rectangle",
+      settings,
+      product,
+      "standard",
+    ).price,
+    4500,
+  );
+  assert.equal(
+    calculateSelectionPrice(
+      "set",
+      dimensions,
+      "rectangle",
+      settings,
+      product,
+      "custom",
+    ).price,
+    2480,
+  );
+  const item = {
+    slug: "set",
+    configuration: {
+      source: "product",
+      dimensions,
+      pricingMode: "standard",
+    } as Configuration,
+  };
+  assert.notEqual(
+    cartKey(item),
+    cartKey({
+      ...item,
+      configuration: { ...item.configuration, pricingMode: "custom" },
+    }),
+  );
 });
 
 test("Server rejects forged standard sizes and infers old cart selections safely", () => {
   const catalog = products.map((p) => ({ ...p, price: 5000, salePrice: 4500 }));
-  const item = { slug: "set", quantity: 1, configuration: { source: "product", dimensions, pricingMode: "standard" } };
+  const item = {
+    slug: "set",
+    quantity: 1,
+    configuration: { source: "product", dimensions, pricingMode: "standard" },
+  };
   assert.equal(quoteItem(item, catalog, initialPricing).price, 4500);
-  assert.equal(quoteItem(item, catalog.map((p) => ({ ...p, salePrice: 4250 })), settings).price, 4250);
-  const customDimensions = { ...dimensions, panel: { width: 53.5, height: 72.2 } };
-  assert.equal(quoteItem({ ...item, configuration: { ...item.configuration, dimensions: customDimensions } }, catalog, settings).price, null);
-  assert.equal(quoteItem({ ...item, configuration: { source: "product", dimensions: customDimensions } }, catalog, settings).price, 2625.08);
-  assert.equal(quoteItem({ ...item, configuration: { source: "product", dimensions } }, catalog, settings).price, 4500);
+  assert.equal(
+    quoteItem(
+      item,
+      catalog.map((p) => ({ ...p, salePrice: 4250 })),
+      settings,
+    ).price,
+    4250,
+  );
+  const customDimensions = {
+    ...dimensions,
+    panel: { width: 53.5, height: 72.2 },
+  };
+  assert.equal(
+    quoteItem(
+      {
+        ...item,
+        configuration: { ...item.configuration, dimensions: customDimensions },
+      },
+      catalog,
+      settings,
+    ).price,
+    null,
+  );
+  assert.equal(
+    quoteItem(
+      {
+        ...item,
+        configuration: { source: "product", dimensions: customDimensions },
+      },
+      catalog,
+      settings,
+    ).price,
+    2625.08,
+  );
+  assert.equal(
+    quoteItem(
+      { ...item, configuration: { source: "product", dimensions } },
+      catalog,
+      settings,
+    ).price,
+    4500,
+  );
 });
 
 test("Standard builder prices are explicit admin values, never inferred from m² or whole set parts", () => {
-  const configuration = { source: "builder", kind: "set", left: "01", right: "01", clock: "48", numeral: "romen", dimensions, pricingMode: "standard" };
+  const configuration = {
+    source: "builder",
+    kind: "set",
+    left: "01",
+    right: "01",
+    clock: "48",
+    numeral: "romen",
+    dimensions,
+    pricingMode: "standard",
+  };
   const item = { slug: "ozel-set", quantity: 1, configuration };
   assert.equal(quoteItem(item, products, settings).price, null);
-  assert.equal(quoteItem(item, products, { ...initialPricing, builderSetPrice: 8500 }).price, 8500);
-  assert.equal(quoteItem({ ...item, slug: "ozel-saat", configuration: { ...configuration, kind: "saat" } }, products, { ...initialPricing, builderClockPrice: 3800 }).price, 3800);
-  assert.equal(pricingSchema.safeParse({ ...settings, builderSetPrice: -1 }).success, false);
+  assert.equal(
+    quoteItem(item, products, { ...initialPricing, builderSetPrice: 8500 })
+      .price,
+    8500,
+  );
+  assert.equal(
+    quoteItem(
+      {
+        ...item,
+        slug: "ozel-saat",
+        configuration: { ...configuration, kind: "saat" },
+      },
+      products,
+      { ...initialPricing, builderClockPrice: 3800 },
+    ).price,
+    3800,
+  );
+  assert.equal(
+    pricingSchema.safeParse({ ...settings, builderSetPrice: -1 }).success,
+    false,
+  );
   const { builderSetPrice, builderClockPrice, ...legacy } = initialPricing;
   assert.equal(pricingSchema.parse(legacy).builderSetPrice, null);
+});
+
+test("Shipping inclusion comes from catalogue products, including all selected builder parts", () => {
+  const eligible = products.map((p) => ({
+    ...p,
+    price: 700,
+    shippingIncluded: true,
+  }));
+  const item = {
+    slug: "set",
+    quantity: 1,
+    configuration: { source: "product", dimensions, pricingMode: "standard" },
+  };
+  assert.equal(quoteItem(item, eligible, settings).shippingIncluded, true);
+  assert.ok(
+    quoteItem(item, eligible, settings).options.includes("Kargo dahil"),
+  );
+  const forged = { ...item, shippingIncluded: true };
+  assert.equal(quoteItem(forged, products, settings).shippingIncluded, false);
+  const builder = {
+    slug: "ozel-set",
+    quantity: 1,
+    configuration: {
+      source: "builder",
+      kind: "set",
+      left: "01",
+      right: "01",
+      clock: "48",
+      numeral: "romen",
+      dimensions,
+      pricingMode: "custom",
+    },
+  };
+  const included = quoteItem(builder, eligible, settings);
+  assert.notEqual(included.price, null);
+  assert.equal(included.shippingIncluded, true);
+  assert.equal(
+    quoteItem(
+      builder,
+      eligible.map((p) =>
+        p.code === "01" ? { ...p, shippingIncluded: false } : p,
+      ),
+      settings,
+    ).shippingIncluded,
+    false,
+  );
 });

@@ -87,7 +87,7 @@ export default async function AdminPage({
             slug: p.slug,
             title: p.title,
             categoryId: p.categoryId,
-            active: p.active,
+            shippingIncluded: p.shippingIncluded,
             featured: p.featured,
             type: p.type,
             price: p.price,

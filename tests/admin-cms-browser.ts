@@ -30,6 +30,113 @@ export async function verifyAdminCms({
     const page = await context.newPage();
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto(base + "/admin/urunler/yeni");
+    const main = page.getByRole("main");
+    for (const label of ["Ürün adı", "Açıklama", "Fiyat (₺)"]) {
+      await expect(main.getByLabel(label, { exact: true })).toHaveAttribute(
+        "required",
+        "",
+      );
+    }
+    await expect(main.getByText("Mağazada aktif", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(main.getByLabel("Kargo", { exact: true })).toHaveValue(
+      "excluded",
+    );
+    const productResponse = await context.request.post(
+      base + "/api/admin/products",
+      {
+        headers: { Origin: base },
+        data: {
+          data: {
+            title: "CMS Kargo Ürünü",
+            slug: "cms-kargo-urunu",
+            categoryId: "tablo-saat-setleri",
+            description: "Tarayıcı kontrolü için ürün açıklaması.",
+            price: 700,
+            salePrice: null,
+            stock: null,
+            type: "set",
+            active: false,
+            featured: false,
+            shippingIncluded: false,
+            images: [
+              {
+                url: "/images/products/woya/woya-01.webp",
+                alt: "Ürün",
+                x: 50,
+                y: 50,
+              },
+            ],
+          },
+        },
+      },
+    );
+    expect(productResponse.status()).toBe(200);
+    const productId = (await productResponse.json()).id;
+    await page.goto(base + "/admin/urunler/" + productId);
+    await main.getByLabel("Kargo", { exact: true }).selectOption("included");
+    await main.getByLabel("Fiyat (₺)", { exact: true }).fill("750");
+    let productPosts = 0;
+    page.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        request.url() === base + "/api/admin/products"
+      )
+        productPosts++;
+    });
+    page.once("dialog", async (dialog) => {
+      expect(dialog.message()).toContain("emin misiniz");
+      await dialog.dismiss();
+    });
+    await main
+      .getByRole("button", { name: "Değişiklikleri kaydet", exact: true })
+      .click();
+    expect(productPosts).toBe(0);
+    await expect(page).toHaveURL(base + "/admin/urunler/" + productId);
+    page.once("dialog", async (dialog) => {
+      expect(dialog.message()).toContain("doğrudan yayınlanacak");
+      await dialog.accept();
+    });
+    await main
+      .getByRole("button", { name: "Değişiklikleri kaydet", exact: true })
+      .click();
+    await expect(page).toHaveURL(/admin\/urunler\?kaydedildi=1/);
+    expect(productPosts).toBe(1);
+    await page.goto(base + "/admin/urunler/" + productId);
+    await expect(main.getByLabel("Kargo", { exact: true })).toHaveValue(
+      "included",
+    );
+    await expect(main.getByLabel("Fiyat (₺)", { exact: true })).toHaveValue(
+      "750",
+    );
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.screenshot({
+        path: `work/cms-qa/product-controls-${width}.png`,
+        fullPage: true,
+      });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+      ).toBe(true);
+    }
+    await page.goto(base + "/urunler/cms-kargo-urunu");
+    await expect(main.getByText("Kargo dahil", { exact: true })).toBeVisible();
+    await expect(
+      main.getByRole("button", {
+        name: "CMS Kargo Ürünü sepete ekle",
+        exact: true,
+      }),
+    ).toBeEnabled();
+    const removed = await context.request.delete(base + "/api/admin/products", {
+      headers: { Origin: base },
+      data: { id: productId, version: 2 },
+    });
+    expect(removed.status()).toBe(200);
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(base + "/admin/magaza");
     await expect(
       page.getByLabel("Toplam teslim süresi (iş günü)", { exact: true }),
