@@ -2,29 +2,67 @@
   min-width: 0;
   margin: 16px 0 24px;
 }
+.selector {
+  margin: 0;
+}
+.selector select {
+  width: 100%;
+  min-width: 0;
+}
+.editor {
+  padding: 16px 0;
+}
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.fields label {
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+}
+.fields input {
+  width: 100%;
+  min-width: 0;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.section .actions button {
+  font-weight: 400;
+  min-height: 40px;
+}
+.saved {
+  border-block: 1px solid #dcdde0;
+  margin-top: 16px;
+}
+.saved summary {
+  cursor: pointer;
+  padding: 14px 0;
+  font-size: 14px;
+}
+.saved summary span {
+  color: #656970;
+  margin-left: 6px;
+}
 .rows {
-  border-top: 1px solid #dcdde0;
-  max-height: 580px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 340px;
   overflow-y: auto;
-  padding-right: 8px;
   overscroll-behavior: contain;
 }
 .row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.3fr) repeat(2, minmax(100px, 1fr));
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
   align-items: center;
-  padding: 14px 0;
-  border-bottom: 1px solid #dcdde0;
-}
-.row label {
-  min-width: 0;
-  margin: 0;
-  font-size: 12px;
-}
-.row input {
-  width: 100%;
-  min-width: 0;
+  padding: 12px 0;
+  border-top: 1px solid #e3e4e6;
 }
 .size {
   font-size: 13px;
@@ -35,12 +73,54 @@
   color: #666;
   font-size: 11px;
 }
+.amount {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.amount del {
+  color: #777;
+  font-size: 11px;
+}
+.rowActions {
+  display: flex;
+  gap: 4px;
+}
+.rowActions button {
+  min-width: 36px;
+  min-height: 36px;
+}
+.notice,
+.empty,
+.error {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 12px 0 0;
+}
+.notice,
+.empty {
+  color: #5f6668;
+}
+.error {
+  color: #a72e22;
+}
 @media (max-width: 650px) {
   .row {
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
   }
   .size {
-    grid-column: 1/-1;
+    grid-column: 1;
+  }
+  .amount {
+    grid-column: 1;
+    flex-direction: row;
+    gap: 8px;
+  }
+  .rowActions {
+    grid-column: 2;
+    grid-row: 1 / 3;
   }
 }

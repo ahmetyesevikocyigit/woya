@@ -1,5 +1,30 @@
-import { chromium, expect } from "@playwright/test";
+import { chromium, expect, type Locator } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
+
+async function pickSize(region: Locator, label: string) {
+  const existing = region.getByRole("option", {
+    name: label + " · Eklendi",
+    exact: true,
+  });
+  const option = (await existing.count())
+    ? existing
+    : region.getByRole("option", { name: label, exact: true });
+  await region
+    .getByRole("combobox", { name: "Ölçü seç", exact: true })
+    .selectOption((await option.getAttribute("value"))!);
+}
+async function setSizePrice(
+  region: Locator,
+  label: string,
+  price: string,
+  sale = "",
+) {
+  await pickSize(region, label);
+  await region.getByLabel("Fiyat (₺)", { exact: true }).fill(price);
+  await region.getByLabel("İndirimli fiyat (₺)", { exact: true }).fill(sale);
+  await region.getByRole("button", { name: /^(Ekle|Güncelle)$/ }).click();
+  await expect(region.getByLabel("Fiyat (₺)", { exact: true })).toHaveCount(0);
+}
 
 export async function verifyAdminCms({
   base,
@@ -32,7 +57,7 @@ export async function verifyAdminCms({
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(base + "/admin/urunler/yeni");
     const main = page.getByRole("main");
-    for (const label of ["Ürün adı", "Açıklama", "Fiyat (₺)"]) {
+    for (const label of ["Ürün adı", "Açıklama"]) {
       await expect(main.getByLabel(label, { exact: true })).toHaveAttribute(
         "required",
         "",
@@ -44,6 +69,39 @@ export async function verifyAdminCms({
     await expect(
       main.getByRole("combobox", { name: "Kargo", exact: true }),
     ).toHaveValue("excluded");
+    const sizes = main.getByRole("region", {
+      name: "Ölçülere göre fiyatlar",
+      exact: true,
+    });
+    await expect(sizes.getByRole("spinbutton")).toHaveCount(0);
+    await pickSize(sizes, "Tablo 50 × 70 cm · Saat 60 × 60 cm");
+    await sizes.getByRole("button", { name: "Ekle", exact: true }).click();
+    await expect(sizes.getByRole("alert")).toContainText("toplam fiyat girin");
+    await sizes.getByLabel("Fiyat (₺)", { exact: true }).fill("500");
+    await sizes.getByLabel("İndirimli fiyat (₺)", { exact: true }).fill("600");
+    await sizes.getByRole("button", { name: "Ekle", exact: true }).click();
+    await expect(sizes.getByRole("alert")).toContainText("düşük olmalı");
+    await sizes.getByLabel("İndirimli fiyat (₺)", { exact: true }).fill("");
+    await sizes.getByRole("button", { name: "Ekle", exact: true }).click();
+    await expect(sizes.getByRole("spinbutton")).toHaveCount(0);
+    await expect(
+      sizes.getByRole("button", {
+        name: "Tablo 50 × 70 cm · Saat 60 × 60 cm kaldır",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await setSizePrice(sizes, "Tablo 50 × 70 cm · Saat 50 × 50 cm", "650");
+    await expect(sizes.getByRole("listitem")).toHaveCount(2);
+    await sizes
+      .getByRole("button", {
+        name: "Tablo 50 × 70 cm · Saat 50 × 50 cm kaldır",
+        exact: true,
+      })
+      .click();
+    await expect(sizes.getByRole("listitem")).toHaveCount(1);
+    await setSizePrice(sizes, "Tablo 50 × 70 cm · Saat 50 × 50 cm", "700");
+    await setSizePrice(sizes, "Tablo 50 × 70 cm · Saat 50 × 50 cm", "750");
+    await expect(sizes.getByRole("listitem")).toHaveCount(2);
     const productResponse = await context.request.post(
       base + "/api/admin/products",
       {
@@ -79,15 +137,20 @@ export async function verifyAdminCms({
     await main
       .getByRole("combobox", { name: "Kargo", exact: true })
       .selectOption("included");
-    await main.getByLabel("Fiyat (₺)", { exact: true }).fill("750");
-    await main
-      .getByLabel("Tablo 50 × 70 cm · Saat 50 × 50 cm fiyat", { exact: true })
-      .fill("850");
-    await main
-      .getByLabel("Tablo 50 × 70 cm · Saat 50 × 50 cm indirimli fiyat", {
+    await expect(sizes.getByRole("spinbutton")).toHaveCount(0);
+    await setSizePrice(sizes, "Tablo 50 × 70 cm · Saat 60 × 60 cm", "750");
+    await setSizePrice(
+      sizes,
+      "Tablo 50 × 70 cm · Saat 50 × 50 cm",
+      "850",
+      "800",
+    );
+    await sizes
+      .getByRole("button", {
+        name: "Tablo 50 × 70 cm · Saat 70 × 70 cm kaldır",
         exact: true,
       })
-      .fill("800");
+      .click();
     await main.getByLabel("Tablo · 1 m² (₺)", { exact: true }).fill("10000");
     await main.getByLabel("Saat · 1 m² (₺)", { exact: true }).fill("5000");
     let productPosts = 0;
@@ -98,6 +161,19 @@ export async function verifyAdminCms({
       )
         productPosts++;
     });
+    await pickSize(sizes, "Tablo 50 × 70 cm · Saat 50 × 50 cm");
+    await sizes.getByLabel("Fiyat (₺)", { exact: true }).fill("999");
+    await main
+      .getByRole("button", { name: "Değişiklikleri kaydet", exact: true })
+      .click();
+    await expect(
+      main.getByText(
+        "Seçtiğiniz ölçüyü önce Ekle/Güncelle ile listeye alın veya Vazgeç düğmesine basın.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect(productPosts).toBe(0);
+    await sizes.getByRole("button", { name: "Vazgeç", exact: true }).click();
     page.once("dialog", async (dialog) => {
       expect(dialog.message()).toContain("emin misiniz");
       await dialog.dismiss();
@@ -120,13 +196,30 @@ export async function verifyAdminCms({
     await expect(
       main.getByRole("combobox", { name: "Kargo", exact: true }),
     ).toHaveValue("included");
-    await expect(main.getByLabel("Fiyat (₺)", { exact: true })).toHaveValue(
+    await expect(sizes.getByRole("spinbutton")).toHaveCount(0);
+    await pickSize(sizes, "Tablo 50 × 70 cm · Saat 60 × 60 cm");
+    await expect(sizes.getByLabel("Fiyat (₺)", { exact: true })).toHaveValue(
       "750",
     );
+    await sizes.getByRole("button", { name: "Vazgeç", exact: true }).click();
+    await expect(
+      sizes.getByRole("option", {
+        name: "Tablo 50 × 70 cm · Saat 70 × 70 cm",
+        exact: true,
+      }),
+    ).toHaveCount(1);
+    await expect(sizes.locator("details")).not.toHaveAttribute("open", "");
+
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 });
       await page.screenshot({
         path: `work/cms-qa/product-controls-${width}.png`,
+        fullPage: true,
+      });
+      await sizes.locator("summary").click();
+      await pickSize(sizes, "Tablo 50 × 70 cm · Saat 50 × 50 cm");
+      await page.screenshot({
+        path: "work/cms-qa/size-picker-open-" + width + ".png",
         fullPage: true,
       });
       expect(
@@ -134,6 +227,8 @@ export async function verifyAdminCms({
           () => document.documentElement.scrollWidth <= innerWidth + 1,
         ),
       ).toBe(true);
+      await sizes.getByRole("button", { name: "Vazgeç", exact: true }).click();
+      await sizes.locator("summary").click();
     }
     await page.goto(base + "/urunler/cms-kargo-urunu");
     await expect(main.getByText("Kargo dahil", { exact: true })).toBeVisible();
@@ -296,29 +391,23 @@ export async function verifyBuilderSizePrices({
       name: "Saat ölçü fiyatları",
       exact: true,
     });
-    await set
-      .getByLabel("Tablo 50 × 70 cm · Saat 60 × 60 cm fiyat", { exact: true })
-      .fill("7700");
-    await set
-      .getByLabel("Tablo 50 × 70 cm · Saat 60 cm çap fiyat", { exact: true })
-      .fill("7800");
-    await clock
-      .getByLabel("Saat 60 × 60 cm fiyat", { exact: true })
-      .fill("9900");
-    await clock
-      .getByLabel("Saat 60 cm çap fiyat", { exact: true })
-      .fill("9800");
+    await expect(set.getByRole("spinbutton")).toHaveCount(0);
+    await expect(clock.getByRole("spinbutton")).toHaveCount(0);
+    await setSizePrice(set, "Tablo 50 × 70 cm · Saat 60 × 60 cm", "7700");
+    await setSizePrice(set, "Tablo 50 × 70 cm · Saat 60 cm çap", "7800");
+    await setSizePrice(clock, "Saat 60 × 60 cm", "9900");
+    await setSizePrice(clock, "Saat 60 cm çap", "9800");
     page.once("dialog", (d) => d.accept());
     await page
       .getByRole("button", { name: "Değişiklikleri kaydet", exact: true })
       .click();
     await expect(page).toHaveURL(/kaydedildi=1/);
     await page.reload();
-    await expect(
-      set.getByLabel("Tablo 50 × 70 cm · Saat 60 cm çap fiyat", {
-        exact: true,
-      }),
-    ).toHaveValue("7800");
+    await pickSize(set, "Tablo 50 × 70 cm · Saat 60 cm çap");
+    await expect(set.getByLabel("Fiyat (₺)", { exact: true })).toHaveValue(
+      "7800",
+    );
+    await set.getByRole("button", { name: "Vazgeç", exact: true }).click();
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 });
       expect(

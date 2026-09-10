@@ -15,6 +15,8 @@ export function PricingForm({
 }) {
   const [value, setValue] = useState(initial);
   const [validation, setValidation] = useState("");
+  const [pendingSet, setPendingSet] = useState(false);
+  const [pendingClock, setPendingClock] = useState(false);
   const { busy, error, save } = useSave();
   function field<K extends keyof PricingSettings>(
     key: K,
@@ -27,6 +29,12 @@ export function PricingForm({
       className="admin-form"
       onSubmit={(e) => {
         e.preventDefault();
+        if (pendingSet || pendingClock) {
+          setValidation(
+            "Seçtiğiniz ölçüyü önce Ekle/Güncelle ile listeye alın veya Vazgeç düğmesine basın.",
+          );
+          return;
+        }
         const parsed = pricingSchema.safeParse({
           ...value,
           builderSetPrices: value.builderSetPrices ?? [
@@ -67,6 +75,7 @@ export function PricingForm({
       >
         <h2>Kendin Oluştur · Set ölçü fiyatları</h2>
         <SizePrices
+          onDraftChange={setPendingSet}
           kind="set"
           shape="rectangle"
           bothShapes
@@ -93,6 +102,7 @@ export function PricingForm({
         />
         <h2>Kendin Oluştur · Tek saat ölçü fiyatları</h2>
         <SizePrices
+          onDraftChange={setPendingClock}
           kind="saat"
           shape="rectangle"
           bothShapes

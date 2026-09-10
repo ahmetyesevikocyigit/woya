@@ -230,6 +230,7 @@ export function ProductForm({
     }));
   }
   const [cropping, setCropping] = useState(false);
+  const [pendingSize, setPendingSize] = useState(false);
   const { busy, error, save } = useSave();
   const [validationError, setValidationError] = useState("");
   function field<K extends keyof ProductInput>(name: K, next: ProductInput[K]) {
@@ -241,6 +242,12 @@ export function ProductForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (cropping || busy) return;
+        if (pendingSize) {
+          setValidationError(
+            "Seçtiğiniz ölçüyü önce Ekle/Güncelle ile listeye alın veya Vazgeç düğmesine basın.",
+          );
+          return;
+        }
         const parsed = productSaveSchema.safeParse(
           kind
             ? {
@@ -384,6 +391,8 @@ export function ProductForm({
             <>
               <h2>Ölçülere göre fiyatlar</h2>
               <SizePrices
+                key={kind + ":" + shape}
+                onDraftChange={setPendingSize}
                 kind={kind}
                 shape={shape}
                 settings={pricing}
