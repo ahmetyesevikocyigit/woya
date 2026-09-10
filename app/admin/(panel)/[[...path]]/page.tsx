@@ -60,9 +60,10 @@ export default async function AdminPage({
   if (section === "urunler") {
     if (id) {
       if (id !== "yeni" && !z.uuid().safeParse(id).success) notFound();
-      const [product, categories] = await Promise.all([
+      const [product, categories, pricingRecord] = await Promise.all([
         id === "yeni" ? undefined : getProduct(id),
         getCategories(),
+        getPricingRecord(),
       ]);
       if (id !== "yeni" && !product) notFound();
       title = product ? "Ürünü Düzenle" : "Yeni Ürün";
@@ -71,6 +72,7 @@ export default async function AdminPage({
           key={`${id}-${product?.version}`}
           product={product}
           categories={categories}
+          pricing={pricingRecord.data}
         />
       );
     } else {

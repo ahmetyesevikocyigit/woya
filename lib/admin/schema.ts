@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { cropRegionsSchema } from "../crop";
+import { measurementPricingSchema, validateSizeRows } from "../size-pricing";
 z.config(z.locales.tr());
 
 export const slugSchema = z
@@ -70,6 +71,7 @@ export const productSchema = z
     clockShape: z.enum(["rectangle", "circle"]).optional(),
     active: z.boolean().default(true),
     shippingIncluded: z.boolean().default(false),
+    measurementPricing: measurementPricingSchema.optional(),
     featured: z.boolean(),
     images: z.array(imageSchema).min(1).max(12),
     builderParts: builderPartsSchema.optional(),
@@ -95,7 +97,14 @@ export const productSchema = z
   );
 // Legacy records can still be read with a missing price; every admin save must supply one.
 export const productSaveSchema = productSchema
-  .refine((value) => value.price !== null, {
+  .superRefine((v, ctx) => {
+    if (v.measurementPricing && v.type !== "rehber")
+      validateSizeRows(v.measurementPricing.rows, v.type, ctx, [
+        "measurementPricing",
+        "rows",
+      ]);
+  })
+  .refine((value) => value.type === "rehber" || value.price !== null, {
     message: "Ürün fiyatı zorunludur.",
     path: ["price"],
   })

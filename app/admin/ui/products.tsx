@@ -11,6 +11,9 @@ import {
   type ProductRecord,
 } from "@/lib/admin/schema";
 import { ImageEditor } from "./images";
+import { SizePrices } from "./size-prices";
+import { selectionRows, canonicalProductPrice } from "@/lib/size-pricing";
+import { clockShapeFor, type PricingSettings } from "@/lib/pricing";
 import { Empty, FormEnd, money, useSave } from "./shared";
 const PartCropEditor = dynamic(() => import("./part-crop-editor"), {
   loading: () => <p role="status">Kırpma aracı yükleniyor…</p>,
@@ -198,11 +201,34 @@ const slugify = (v: string) =>
 export function ProductForm({
   product,
   categories,
+  pricing,
 }: {
   product?: ProductRecord;
   categories: Category[];
+  pricing: PricingSettings;
 }) {
   const [value, setValue] = useState<ProductInput>(product ?? newProduct);
+  const kind = value.type === "rehber" ? null : value.type;
+  const shape = clockShapeFor(value);
+  const measurementPricing = value.measurementPricing ?? {
+    rows: kind
+      ? selectionRows(kind, shape, pricing, value.price, value.salePrice)
+      : [],
+    panelRate: null,
+    clockRate: null,
+  };
+  function setMeasurementPricing(next: typeof measurementPricing) {
+    setValue((v) => ({
+      ...v,
+      measurementPricing: next,
+      ...(kind
+        ? canonicalProductPrice(kind, shape, pricing, {
+            ...v,
+            measurementPricing: next,
+          })
+        : {}),
+    }));
+  }
   const [cropping, setCropping] = useState(false);
   const { busy, error, save } = useSave();
   const [validationError, setValidationError] = useState("");
@@ -215,7 +241,18 @@ export function ProductForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (cropping || busy) return;
-        const parsed = productSaveSchema.safeParse(value);
+        const parsed = productSaveSchema.safeParse(
+          kind
+            ? {
+                ...value,
+                measurementPricing,
+                ...canonicalProductPrice(kind, shape, pricing, {
+                  ...value,
+                  measurementPricing,
+                }),
+              }
+            : value,
+        );
         if (!parsed.success) {
           setValidationError(
             parsed.error.issues.map((issue) => issue.message).join("\n"),
@@ -305,6 +342,7 @@ export function ProductForm({
                   setValue((v) => ({
                     ...v,
                     type: e.target.value as ProductInput["type"],
+                    measurementPricing: undefined,
                     builderParts: v.builderParts
                       ? { ...v.builderParts, enabled: false }
                       : undefined,
@@ -330,7 +368,11 @@ export function ProductForm({
                     : "rectangle")
                 }
                 onChange={(e) =>
-                  field("clockShape", e.target.value as "circle" | "rectangle")
+                  setValue((v) => ({
+                    ...v,
+                    clockShape: e.target.value as "circle" | "rectangle",
+                    measurementPricing: undefined,
+                  }))
                 }
               >
                 <option value="rectangle">Kare / dikdörtgen</option>
@@ -338,37 +380,59 @@ export function ProductForm({
               </select>
             </label>
           )}
-          <div className="admin-two">
-            {(
-              [
-                ["price", "Fiyat (₺)"],
-                ["salePrice", "İndirimli fiyat (₺)"],
-              ] as const
-            ).map(([name, label]) => (
-              <label key={name}>
-                {label}
-                <input
-                  type="number"
-                  required={name === "price"}
-                  max={10000000}
-                  min={0.01}
-                  step={0.01}
-                  placeholder={name === "price" ? "Zorunlu" : "İsteğe bağlı"}
-                  value={value[name] ?? ""}
-                  onChange={(e) =>
-                    field(
-                      name,
-                      e.target.value === "" ? null : Number(e.target.value),
-                    )
-                  }
-                />
-              </label>
-            ))}
-          </div>
-          {value.type !== "rehber" && (
-            <Link className="admin-inline-link" href="/admin/fiyatlandirma">
-              Özel ölçü m² fiyatlarını düzenle
-            </Link>
+          {kind && (
+            <>
+              <h2>Ölçülere göre fiyatlar</h2>
+              <SizePrices
+                kind={kind}
+                shape={shape}
+                settings={pricing}
+                rows={measurementPricing.rows}
+                product
+                onChange={(rows) =>
+                  setMeasurementPricing({ ...measurementPricing, rows })
+                }
+              />
+              <h2>Özel ölçü tarifesi</h2>
+              <div className="admin-two">
+                {(
+                  [
+                    ["panelRate", "Tablo · 1 m² (₺)"],
+                    ["clockRate", "Saat · 1 m² (₺)"],
+                  ] as const
+                )
+                  .filter(
+                    ([key]) =>
+                      kind === "set" ||
+                      (kind === "tablo"
+                        ? key === "panelRate"
+                        : key === "clockRate"),
+                  )
+                  .map(([key, label]) => (
+                    <label key={key}>
+                      {label}
+                      <input
+                        type="number"
+                        min="0.01"
+                        max="10000000"
+                        step="0.01"
+                        placeholder="Tanımlanmadı"
+                        value={measurementPricing[key] ?? ""}
+                        onChange={(e) =>
+                          setMeasurementPricing({
+                            ...measurementPricing,
+                            [key]:
+                              e.target.value === ""
+                                ? null
+                                : Number(e.target.value),
+                          })
+                        }
+                      />
+                    </label>
+                  ))}
+              </div>
+              <p>Gerekli tarifeler girildiğinde özel ölçü siparişe açılır.</p>
+            </>
           )}
           <label>
             Kargo

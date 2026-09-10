@@ -80,6 +80,16 @@ export async function verifyAdminCms({
       .getByRole("combobox", { name: "Kargo", exact: true })
       .selectOption("included");
     await main.getByLabel("Fiyat (₺)", { exact: true }).fill("750");
+    await main
+      .getByLabel("Tablo 50 × 70 cm · Saat 50 × 50 cm fiyat", { exact: true })
+      .fill("850");
+    await main
+      .getByLabel("Tablo 50 × 70 cm · Saat 50 × 50 cm indirimli fiyat", {
+        exact: true,
+      })
+      .fill("800");
+    await main.getByLabel("Tablo · 1 m² (₺)", { exact: true }).fill("10000");
+    await main.getByLabel("Saat · 1 m² (₺)", { exact: true }).fill("5000");
     let productPosts = 0;
     page.on("request", (request) => {
       if (
@@ -133,6 +143,25 @@ export async function verifyAdminCms({
         exact: true,
       }),
     ).toBeEnabled();
+    await main
+      .getByRole("combobox", { name: "Saat ölçüsü seçimi", exact: true })
+      .selectOption("1");
+    await expect(main.getByText("₺800,00", { exact: true })).toBeVisible();
+    await main
+      .getByRole("combobox", { name: "Saat ölçüsü seçimi", exact: true })
+      .selectOption("custom");
+    await expect(main.getByText("₺800,00", { exact: true })).toBeVisible();
+    const clockGroup = main.getByRole("group", {
+      name: "Saat ölçüsü",
+      exact: true,
+    });
+    await clockGroup.getByLabel("En (cm)", { exact: true }).fill("65");
+    await clockGroup.getByLabel("Boy (cm)", { exact: true }).fill("67");
+    await expect(main.getByText("₺9.177,50", { exact: true })).toBeVisible();
+    await page.screenshot({
+      path: "work/cms-qa/product-custom-price.png",
+      fullPage: true,
+    });
     const removed = await context.request.delete(base + "/api/admin/products", {
       headers: { Origin: base },
       data: { id: productId, version: 2 },
@@ -226,6 +255,92 @@ export async function verifyAdminCms({
     expect(errors).toEqual([]);
     console.log(
       "PASS CMS browser: settings persist across sections/reload, public announcement updates, responsive CMS pages and mobile navigation work",
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
+export async function verifyBuilderSizePrices({
+  base,
+  cookie,
+}: {
+  base: string;
+  cookie: string;
+}) {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 1000 },
+    });
+    const split = cookie.indexOf("=");
+    await context.addCookies([
+      {
+        name: cookie.slice(0, split),
+        value: cookie.slice(split + 1),
+        url: base,
+      },
+    ]);
+    await context.route("**/*", (route) =>
+      new URL(route.request().url()).origin === base
+        ? route.continue()
+        : route.fulfill({ status: 200, body: "" }),
+    );
+    const page = await context.newPage();
+    await page.goto(base + "/admin/fiyatlandirma");
+    const set = page.getByRole("region", {
+      name: "Set ölçü fiyatları",
+      exact: true,
+    });
+    const clock = page.getByRole("region", {
+      name: "Saat ölçü fiyatları",
+      exact: true,
+    });
+    await set
+      .getByLabel("Tablo 50 × 70 cm · Saat 60 × 60 cm fiyat", { exact: true })
+      .fill("7700");
+    await set
+      .getByLabel("Tablo 50 × 70 cm · Saat 60 cm çap fiyat", { exact: true })
+      .fill("7800");
+    await clock
+      .getByLabel("Saat 60 × 60 cm fiyat", { exact: true })
+      .fill("9900");
+    await clock
+      .getByLabel("Saat 60 cm çap fiyat", { exact: true })
+      .fill("9800");
+    page.once("dialog", (d) => d.accept());
+    await page
+      .getByRole("button", { name: "Değişiklikleri kaydet", exact: true })
+      .click();
+    await expect(page).toHaveURL(/kaydedildi=1/);
+    await page.reload();
+    await expect(
+      set.getByLabel("Tablo 50 × 70 cm · Saat 60 cm çap fiyat", {
+        exact: true,
+      }),
+    ).toHaveValue("7800");
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: "work/cms-qa/builder-prices-" + width + ".png",
+        fullPage: true,
+      });
+    }
+    await page.goto(base + "/#kendi-tasariminiz");
+    const builder = page.getByRole("form", {
+      name: "Kişiselleştirilmiş ürün seçimi",
+      exact: true,
+    });
+    await expect(builder.getByText("₺7.700,00", { exact: true })).toBeVisible();
+    await builder.getByRole("button", { name: "Saat", exact: true }).click();
+    await expect(builder.getByText("₺9.900,00", { exact: true })).toBeVisible();
+    console.log(
+      "PASS Builder size prices persist and update the live builder in both modes",
     );
   } finally {
     await browser.close();

@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { getStorefrontCatalog, readCatalog } from "./admin/repository";
 import { clockShapeFor } from "./pricing";
+import { listedPrice } from "./size-pricing";
 import { woyaProducts, type WoyaProduct } from "../app/data/products";
 import type { BuilderParts } from "./admin/schema";
 
@@ -37,7 +38,7 @@ function storefrontPrice(product: {
 export const storefrontProducts = cache(async function storefrontProducts(
   surface?: "saatler" | "tablolar" | "koleksiyon",
 ) {
-  const { products, categories } = await getStorefrontCatalog();
+  const { products, categories, pricing } = await getStorefrontCatalog();
   return products
     .filter(
       (p) =>
@@ -80,6 +81,15 @@ export const storefrontProducts = cache(async function storefrontProducts(
         ],
         images: p.images,
         shippingIncluded: p.shippingIncluded === true,
+        measurementPricing: p.measurementPricing,
+        ...(p.type !== "rehber"
+          ? {
+              listingPrice: listedPrice(p.type, clockShapeFor(p), pricing, p)
+                .price,
+              priceVaries: listedPrice(p.type, clockShapeFor(p), pricing, p)
+                .varies,
+            }
+          : {}),
         price: price.price,
         salePrice: price.salePrice,
         productType: p.type,
@@ -109,6 +119,7 @@ export async function storefrontQuoteData() {
           productType: p.type,
           clockShape: clockShapeFor(p),
           shippingIncluded: p.shippingIncluded === true,
+          measurementPricing: p.measurementPricing,
           price: price.price,
           salePrice: price.salePrice,
           builderParts: publicBuilderParts(p.builderParts),

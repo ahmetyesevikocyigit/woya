@@ -14,6 +14,7 @@ import {
   initialContent,
 } from "../lib/admin/defaults";
 import { defaultDimensions, initialPricing } from "../lib/pricing";
+import { selectionRows } from "../lib/size-pricing";
 
 async function port() {
   const server = createServer().listen(0, "127.0.0.1");
@@ -250,6 +251,83 @@ async function main() {
       "https://evil.test",
     );
     check(disabledOrigin.status === 403, "Cross-origin checkout is rejected");
+    const legacySizeQuote = await quote();
+    const sizeRows = selectionRows("set", "rectangle", initialPricing, 7500);
+    sizeRows[1] = { ...sizeRows[1], price: 8500, salePrice: 8000 };
+    const measurementPricing = {
+      rows: sizeRows,
+      panelRate: 10000,
+      clockRate: 5000,
+    };
+    await pg.query(
+      "UPDATE woya_products SET data=jsonb_set(data,'{measurementPricing}',$1) WHERE id=$2",
+      [JSON.stringify(measurementPricing), productId],
+    );
+    const rowItem = {
+      ...item,
+      configuration: {
+        ...item.configuration,
+        dimensions: sizeRows[1].dimensions,
+        pricingMode: "standard",
+      },
+    };
+    const sizeQuote = await quote([rowItem]);
+    check(
+      sizeQuote.total === 800000 && sizeQuote.shipping === 0,
+      "Checkout uses the chosen size sale price and free-shipping threshold",
+    );
+    check(
+      (
+        await quote([
+          {
+            ...rowItem,
+            configuration: { ...rowItem.configuration, pricingMode: "custom" },
+          },
+        ])
+      ).total === 800000,
+      "Custom mode cannot bypass a ready-size price",
+    );
+    const sizeChanged = await api("/api/odeme/baslat", {
+      requestId: randomUUID(),
+      quoteHash: legacySizeQuote.hash,
+      items: [item],
+      customer,
+      note: "",
+      consent: true,
+    });
+    check(
+      sizeChanged.status === 409,
+      "Checkout rejects an old quote after a measurement price change",
+    );
+    const mixedSize = {
+      ...item,
+      configuration: {
+        ...item.configuration,
+        dimensions: {
+          panel: { width: 53, height: 71 },
+          clock: { width: 65, height: 67 },
+        },
+        pricingMode: "custom",
+      },
+    };
+    check(
+      (await quote([mixedSize])).total === 970350,
+      "Custom checkout uses the product-specific rates for both panels and clock",
+    );
+    sizeRows[1].price = null;
+    sizeRows[1].salePrice = null;
+    await pg.query(
+      "UPDATE woya_products SET data=jsonb_set(data,'{measurementPricing}',$1) WHERE id=$2",
+      [JSON.stringify(measurementPricing), productId],
+    );
+    check(
+      (await api("/api/odeme/ozet", { items: [rowItem] })).status === 409,
+      "Unpriced ready-size combination cannot be bought",
+    );
+    await pg.query(
+      "UPDATE woya_products SET data=data-'measurementPricing' WHERE id=$1",
+      [productId],
+    );
     const beforeShipping = await quote();
     await pg.query(
       "UPDATE woya_products SET data=jsonb_set(data,'{shippingIncluded}','true') WHERE id=$1",

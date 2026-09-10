@@ -15,13 +15,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_TELEMETRY_DISABLED: "1"
       NEXT_PUBLIC_SITE_URL: https://woyatablo.com
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "24"
       - run: corepack enable && corepack prepare pnpm@11.19.0 --activate
       - run: pnpm install --frozen-lockfile
       - run: python3 tests/deploy-archive.test.py
@@ -50,6 +50,13 @@ jobs:
           PY
           pnpm exec playwright install --with-deps chromium
       - run: WOYA_ADMIN_BROWSER_TESTS=1 pnpm test:admin:http && pnpm test:payments:http
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cms-qa
+          path: work/cms-qa
+          retention-days: 7
+          if-no-files-found: ignore
       - run: pnpm test:customer:browser
       - run: node scripts/package-vps.mjs
       - name: Validate and boot the exact deployment archive

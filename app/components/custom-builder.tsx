@@ -1,4 +1,5 @@
 "use client";
+import { builderPriceConfig, findSizePrice } from "@/lib/size-pricing";
 
 import Image from "next/image";
 import { useState } from "react";
@@ -31,10 +32,7 @@ import styles from "./custom-builder.module.css";
 type BuilderMode = "set" | "clock";
 type PartPosition = "left" | "center" | "right";
 
-import {
-  builderCatalog,
-  type SourceOption,
-} from "@/lib/builder-catalog";
+import { builderCatalog, type SourceOption } from "@/lib/builder-catalog";
 
 type ChoiceOption<T extends string> = {
   value: T;
@@ -60,7 +58,10 @@ const partLabels: Record<PartPosition, { title: string; short: string }> = {
 };
 
 function partSource(source: SourceOption, part: PartPosition) {
-  return source.parts?.[part] ?? `/images/builder-parts/woya/refined-v1/woya-${source.code}-${part}.webp`;
+  return (
+    source.parts?.[part] ??
+    `/images/builder-parts/woya/refined-v1/woya-${source.code}-${part}.webp`
+  );
 }
 
 function findSource(options: SourceOption[], code: string) {
@@ -190,17 +191,28 @@ function SourceGrid({
               data-selected={selected ? "true" : undefined}
               type="button"
               aria-pressed={selected}
-              aria-label={[option.name, option.motif, option.tone].filter(Boolean).join(", ")}
+              aria-label={[option.name, option.motif, option.tone]
+                .filter(Boolean)
+                .join(", ")}
               key={`${part}-${option.code}`}
               onClick={() => onSelect(option.code)}
             >
               <span className="mixer-source-thumb">
-                {part === "center" ? <ClockArtwork code={option.code} style={clockStyle} source={option.parts?.center} sizes="160px" /> : <Image
-                  src={partSource(option, part)}
-                  alt=""
-                  fill
-                  sizes="160px"
-                />}
+                {part === "center" ? (
+                  <ClockArtwork
+                    code={option.code}
+                    style={clockStyle}
+                    source={option.parts?.center}
+                    sizes="160px"
+                  />
+                ) : (
+                  <Image
+                    src={partSource(option, part)}
+                    alt=""
+                    fill
+                    sizes="160px"
+                  />
+                )}
               </span>
               <span className="mixer-source-copy">
                 <span>{option.name}</span>
@@ -259,11 +271,14 @@ export function CustomBuilder({
   availableModels: BuilderModel[];
   settings: PricingSettings;
 }) {
-  const { tables: availableTables, clocks: availableClocks } = builderCatalog(availableModels);
+  const { tables: availableTables, clocks: availableClocks } =
+    builderCatalog(availableModels);
   if (!availableClocks.length) return null;
   return (
     <AvailableBuilder
-      key={[...availableTables, ...availableClocks].map((s) => `${s.code}:${s.parts?.center ?? "legacy"}`).join("|")}
+      key={[...availableTables, ...availableClocks]
+        .map((s) => `${s.code}:${s.parts?.center ?? "legacy"}`)
+        .join("|")}
       tableSetSources={availableTables}
       clockSources={availableClocks}
       availableModels={availableModels}
@@ -283,7 +298,9 @@ function AvailableBuilder({
   availableModels: BuilderModel[];
   settings: PricingSettings;
 }) {
-  const [mode, setMode] = useState<BuilderMode>(tableSetSources.length ? "set" : "clock");
+  const [mode, setMode] = useState<BuilderMode>(
+    tableSetSources.length ? "set" : "clock",
+  );
   const [activePart, setActivePart] = useState<PartPosition>("left");
   const [setParts, setSetParts] = useState<Record<PartPosition, string>>({
     left: tableSetSources[0]?.code ?? "",
@@ -291,11 +308,15 @@ function AvailableBuilder({
       clockSources.find((s) => s.code === "10")?.code ?? clockSources[0].code,
     right:
       tableSetSources.find((s) => s.code === "24")?.code ??
-      tableSetSources[0]?.code ?? "",
+      tableSetSources[0]?.code ??
+      "",
   });
   const [clockCode, setClockCode] = useState(clockSources[0].code);
   const [numeralStyle, setNumeralStyle] = useState<NumeralStyle>("romen");
-  const [measurementModes, setMeasurementModes] = useState<MeasurementModes>({ panel: "standard", clock: "standard" });
+  const [measurementModes, setMeasurementModes] = useState<MeasurementModes>({
+    panel: "standard",
+    clock: "standard",
+  });
   const [sizes, setSizes] = useState(() => ({
     panel: { ...settings.panelPresets[0] },
     rectangle: { ...settings.clockPresets[0] },
@@ -316,9 +337,26 @@ function AvailableBuilder({
   const dimensions = { panel: sizes.panel, clock: sizes[shape] };
   const kind = mode === "set" ? "set" : "saat";
   const pricingMode = selectedPricingMode(kind, measurementModes);
-  const price = calculateSelectionPrice(kind, dimensions, shape, settings,
-    { price: kind === "set" ? settings.builderSetPrice : settings.builderClockPrice }, pricingMode);
-  const activeNumeral = currentClock.parts ? { label: "Fotoğraftaki kadran" } : findChoice(numeralOptions, numeralStyle);
+  const priceConfig = builderPriceConfig(kind, settings);
+  const price = calculateSelectionPrice(
+    kind,
+    dimensions,
+    shape,
+    settings,
+    priceConfig,
+    pricingMode,
+  );
+  const selectedPriceRow = priceConfig.measurementPricing
+    ? findSizePrice(
+        priceConfig.measurementPricing.rows,
+        kind,
+        shape,
+        dimensions,
+      )
+    : undefined;
+  const activeNumeral = currentClock.parts
+    ? { label: "Fotoğraftaki kadran" }
+    : findChoice(numeralOptions, numeralStyle);
 
   const partBrowserOptions =
     activePart === "center" ? clockSources : tableSetSources;
@@ -354,7 +392,9 @@ function AvailableBuilder({
       mode === "set"
         ? "Kişiye Özel Tablo ve Saat Seti"
         : currentClock.name + " Dekoratif Saat",
-    image: currentClock.parts?.center ?? clockSource(currentClock.code, numeralStyle),
+    image:
+      currentClock.parts?.center ??
+      clockSource(currentClock.code, numeralStyle),
     configuration: {
       source: "builder",
       kind,
@@ -399,7 +439,8 @@ function AvailableBuilder({
         clockSources.find((s) => s.code === "10")?.code ?? clockSources[0].code,
       right:
         tableSetSources.find((s) => s.code === "24")?.code ??
-        tableSetSources[0]?.code ?? "",
+        tableSetSources[0]?.code ??
+        "",
     });
     setClockCode(clockSources[0].code);
     setMeasurementModes({ panel: "standard", clock: "standard" });
@@ -522,13 +563,15 @@ function AvailableBuilder({
                 </button>
               </div>
 
-              {!currentClock.parts && <ChoiceGrid
-                legend="Saat rakamı"
-                name="set-clock-number"
-                options={numeralOptions}
-                value={numeralStyle}
-                onChange={setNumeralStyle}
-              />}
+              {!currentClock.parts && (
+                <ChoiceGrid
+                  legend="Saat rakamı"
+                  name="set-clock-number"
+                  options={numeralOptions}
+                  value={numeralStyle}
+                  onChange={setNumeralStyle}
+                />
+              )}
             </>
           ) : (
             <>
@@ -543,13 +586,15 @@ function AvailableBuilder({
                 onSelect={setClockCode}
               />
 
-              {!currentClock.parts && <ChoiceGrid
-                legend="Rakam tipi"
-                name="clock-number"
-                options={numeralOptions}
-                value={numeralStyle}
-                onChange={setNumeralStyle}
-              />}
+              {!currentClock.parts && (
+                <ChoiceGrid
+                  legend="Rakam tipi"
+                  name="clock-number"
+                  options={numeralOptions}
+                  value={numeralStyle}
+                  onChange={setNumeralStyle}
+                />
+              )}
             </>
           )}
 
@@ -682,7 +727,15 @@ function AvailableBuilder({
             aria-labelledby="builder-order-total"
           >
             <span id="builder-order-total">Sipariş Tutarı</span>
-            <PriceSummary result={price} kind={kind} />
+            <PriceSummary
+              result={price}
+              kind={kind}
+              originalPrice={
+                selectedPriceRow?.salePrice != null
+                  ? selectedPriceRow.price
+                  : null
+              }
+            />
           </section>
 
           <details className={styles.summary}>

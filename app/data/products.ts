@@ -1,6 +1,9 @@
 export type WoyaProduct = {
   builderParts?: import("@/lib/builder-catalog").BuilderAssets;
   shippingIncluded?: boolean;
+  measurementPricing?: import("@/lib/size-pricing").MeasurementPricing;
+  listingPrice?: number | null;
+  priceVaries?: boolean;
   code: string;
   title: string;
   text: string;

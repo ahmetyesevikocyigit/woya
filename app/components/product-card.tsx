@@ -29,6 +29,10 @@ function currentBatchSize() {
 }
 
 export function ProductCard({ product }: { product: WoyaProduct }) {
+  const displayPrice =
+    product.listingPrice !== undefined
+      ? product.listingPrice
+      : (product.salePrice ?? product.price);
   return (
     <article className="product-card">
       <Link
@@ -53,12 +57,16 @@ export function ProductCard({ product }: { product: WoyaProduct }) {
           <Link href={`/urunler/${product.slug}`}>{product.title}</Link>
         </h3>
         <p>{product.text}</p>
-        {product.price != null && (
+        {displayPrice != null && (
           <p className="product-card-price">
-            {product.salePrice != null && (
-              <del>{formatPrice(product.price)}</del>
-            )}{" "}
-            <strong>{formatPrice(product.salePrice ?? product.price)}</strong>
+            {product.salePrice != null &&
+              product.price != null &&
+              displayPrice === product.salePrice &&
+              !product.priceVaries && (
+                <del>{formatPrice(product.price)}</del>
+              )}{" "}
+            <strong>{formatPrice(displayPrice)}</strong>
+            {product.priceVaries && <span> başlayan fiyat</span>}
           </p>
         )}
         <div className="product-card-actions">

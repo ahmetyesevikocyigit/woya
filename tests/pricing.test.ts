@@ -507,3 +507,177 @@ test("Shipping inclusion comes from catalogue products, including all selected b
     false,
   );
 });
+
+test("Product size tables price exact combinations and prevent switching to a cheaper custom tariff", async () => {
+  const { selectionRows } = await import("../lib/size-pricing");
+  const rows = selectionRows("set", "rectangle", initialPricing, 7500);
+  rows[1] = { ...rows[1], price: 8500, salePrice: 8000 };
+  const product = {
+    price: 7500,
+    measurementPricing: { rows, panelRate: 10000, clockRate: 5000 },
+  };
+  assert.equal(
+    calculateSelectionPrice(
+      "set",
+      rows[0].dimensions,
+      "rectangle",
+      initialPricing,
+      product,
+      "standard",
+    ).price,
+    7500,
+  );
+  for (const mode of ["standard", "custom", undefined] as const)
+    assert.equal(
+      calculateSelectionPrice(
+        "set",
+        rows[1].dimensions,
+        "rectangle",
+        initialPricing,
+        product,
+        mode,
+      ).price,
+      8000,
+    );
+  const missing = {
+    ...product,
+    measurementPricing: { ...product.measurementPricing, rows: [rows[0]] },
+  };
+  assert.equal(
+    calculateSelectionPrice(
+      "set",
+      rows[1].dimensions,
+      "rectangle",
+      initialPricing,
+      missing,
+      "custom",
+    ).price,
+    null,
+  );
+  const custom = {
+    panel: { width: 53, height: 71 },
+    clock: { width: 65, height: 67 },
+  };
+  assert.equal(
+    calculateSelectionPrice(
+      "set",
+      custom,
+      "rectangle",
+      initialPricing,
+      product,
+      "custom",
+    ).price,
+    9703.5,
+  );
+  assert.equal(
+    calculateSelectionPrice(
+      "set",
+      custom,
+      "rectangle",
+      initialPricing,
+      {
+        ...product,
+        measurementPricing: { ...product.measurementPricing, clockRate: null },
+      },
+      "custom",
+    ).price,
+    null,
+  );
+  const expanded = {
+    ...initialPricing,
+    panelPresets: [...initialPricing.panelPresets, { width: 80, height: 110 }],
+  };
+  assert.equal(
+    calculateSelectionPrice(
+      "set",
+      { ...rows[0].dimensions, panel: { width: 80, height: 110 } },
+      "rectangle",
+      expanded,
+      product,
+      "standard",
+    ).price,
+    null,
+  );
+});
+
+test("Circle and single panel tables use only their relevant dimensions; catalogue price is the real minimum", async () => {
+  const { selectionRows, listedPrice, canonicalProductPrice } =
+    await import("../lib/size-pricing");
+  for (const kind of ["saat", "tablo"] as const) {
+    const shape = kind === "saat" ? "circle" : "rectangle";
+    const rows = selectionRows(kind, shape, initialPricing, 7500);
+    rows[0].price = null;
+    rows[1].price = 9000;
+    const p = {
+      price: 7500,
+      measurementPricing: { rows, panelRate: 10000, clockRate: 5000 },
+    };
+    assert.equal(
+      canonicalProductPrice(kind, shape, initialPricing, p).price,
+      9000,
+    );
+    assert.deepEqual(listedPrice(kind, shape, initialPricing, p), {
+      price: 7500,
+      varies: true,
+    });
+    assert.equal(
+      calculateSelectionPrice(
+        kind,
+        rows[1].dimensions,
+        shape,
+        initialPricing,
+        p,
+        "custom",
+      ).price,
+      9000,
+    );
+  }
+  const rows = selectionRows("saat", "circle", initialPricing, 7500);
+  const p = {
+    price: 7500,
+    measurementPricing: { rows, panelRate: null, clockRate: 5000 },
+  };
+  const d = {
+    panel: { width: 10, height: 10 },
+    clock: { width: 71, height: 71 },
+  };
+  assert.equal(
+    calculateSelectionPrice("saat", d, "circle", initialPricing, p, "custom")
+      .price,
+    Math.round(Math.PI * (0.71 / 2) ** 2 * 5000 * 100) / 100,
+  );
+});
+
+test("Size table migration preserves edited rows and is repeatable without inventing custom rates", async () => {
+  const { upgradeProductPricing, upgradeBuilderPricing } =
+    await import("../lib/size-pricing-upgrade");
+  const { initialProducts } = await import("../lib/admin/defaults");
+  const { productSaveSchema } = await import("../lib/admin/schema");
+  const p = upgradeProductPricing(
+    {
+      ...initialProducts().find((p) => p.type === "set")!,
+      price: 7500,
+      salePrice: null,
+    },
+    initialPricing,
+  );
+  assert.equal(p.measurementPricing!.rows[0].price, 7500);
+  assert.equal(p.measurementPricing!.clockRate, null);
+  p.measurementPricing!.rows[0].price = 8900;
+  assert.deepEqual(upgradeProductPricing(p, initialPricing), p);
+  assert.equal(
+    productSaveSchema.safeParse({
+      ...p,
+      measurementPricing: {
+        ...p.measurementPricing,
+        rows: [p.measurementPricing!.rows[0], p.measurementPricing!.rows[0]],
+      },
+    }).success,
+    false,
+  );
+  const s = upgradeBuilderPricing(initialPricing, 7500);
+  assert.ok(s.builderSetPrices!.every((r) => r.price === 7500));
+  assert.ok(s.builderClockPrices!.every((r) => r.price === 7500));
+  assert.deepEqual(upgradeBuilderPricing(s, 7500), s);
+  assert.equal(s.panelRate, null);
+});

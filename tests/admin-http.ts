@@ -1412,6 +1412,90 @@ async function main() {
         (await bcrypt.compare(nextPassword, preserved.password_hash)),
       "Setup never restores old bootstrap password",
     );
+
+    if (process.env.WOYA_ADMIN_BROWSER_TESTS === "1") {
+      await pg.query("DELETE FROM woya_rate_limits");
+      const login = await api("/api/admin/auth", { password: nextPassword });
+      const pricingCookie = login.headers.get("set-cookie")!.split(";")[0];
+      const { verifyBuilderSizePrices } = await import("./admin-cms-browser");
+      await verifyBuilderSizePrices({ base, cookie: pricingCookie });
+    }
+    const ordersBeforeUpgrade = JSON.stringify(
+      (await pg.query("SELECT * FROM woya_orders ORDER BY id")).rows,
+    );
+    const productsBeforeUpgrade = (
+      await pg.query("SELECT id,data FROM woya_products ORDER BY id")
+    ).rows;
+    const migrateSizes = async (name: string) => {
+      const job = spawn(
+        process.execPath,
+        [
+          "node_modules/tsx/dist/cli.mjs",
+          "scripts/size-pricing-migrate.ts",
+          "--confirm-target",
+          "--backup",
+          join(uploadDir, name),
+        ],
+        {
+          env: {
+            ...process.env,
+            DATABASE_URL:
+              "postgres://postgres:" +
+              databasePassword +
+              "@127.0.0.1:" +
+              pgPort +
+              "/postgres",
+          },
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
+      let output = "";
+      job.stdout.on("data", (b) => (output += b));
+      job.stderr.on("data", (b) => (output += b));
+      const [code] = await once(job, "exit");
+      check(code === 0, "Measurement pricing migration succeeds: " + output);
+    };
+    await migrateSizes("sizes-first.json");
+    const upgradedRows = (
+      await pg.query(
+        "SELECT id,data,version,updated_at FROM woya_products ORDER BY id",
+      )
+    ).rows;
+    check(
+      upgradedRows.length === productsBeforeUpgrade.length,
+      "Measurement migration preserves product count",
+    );
+    for (const previous of productsBeforeUpgrade) {
+      const current = upgradedRows.find((row) => row.id === previous.id)!;
+      const { measurementPricing: beforeMatrix, ...beforeData } = previous.data;
+      const { measurementPricing: afterMatrix, ...afterData } = current.data;
+      check(
+        JSON.stringify(beforeData) === JSON.stringify(afterData),
+        "Migration preserves existing product fields",
+      );
+      if (previous.data.type !== "rehber")
+        check(
+          Boolean(afterMatrix),
+          "Sale product has a measurement price table",
+        );
+    }
+    await migrateSizes("sizes-second.json");
+    check(
+      JSON.stringify(
+        (
+          await pg.query(
+            "SELECT id,data,version,updated_at FROM woya_products ORDER BY id",
+          )
+        ).rows,
+      ) === JSON.stringify(upgradedRows),
+      "Repeated migration does not overwrite edited tables or increment versions",
+    );
+    check(
+      JSON.stringify(
+        (await pg.query("SELECT * FROM woya_orders ORDER BY id")).rows,
+      ) === ordersBeforeUpgrade,
+      "Migration preserves order snapshots",
+    );
     console.log(
       `${count} HTTP checks passed. Test database and uploads will be removed.`,
     );

@@ -1,4 +1,5 @@
 "use client";
+import { initialSelectionDimensions, findSizePrice } from "@/lib/size-pricing";
 import { useState } from "react";
 import type { WoyaProduct } from "../data/products";
 import {
@@ -22,7 +23,14 @@ export function MeasuredProduct({
 }) {
   const shape = clockShapeFor(product);
   const [dimensions, setDimensions] = useState(() =>
-    defaultDimensions(settings, shape),
+    product.productType && product.productType !== "rehber"
+      ? initialSelectionDimensions(
+          product.productType,
+          shape,
+          settings,
+          product,
+        )
+      : defaultDimensions(settings, shape),
   );
   const kind = product.productType;
   const [modes, setModes] = useState<MeasurementModes>({
@@ -39,6 +47,9 @@ export function MeasuredProduct({
     product,
     pricingMode,
   );
+  const selectedRow = product.measurementPricing
+    ? findSizePrice(product.measurementPricing.rows, kind, shape, dimensions)
+    : product;
   return (
     <>
       <MeasurementControls
@@ -54,9 +65,7 @@ export function MeasuredProduct({
         result={result}
         kind={kind}
         originalPrice={
-          pricingMode === "standard" && product.salePrice != null
-            ? product.price
-            : null
+          selectedRow?.salePrice != null ? selectedRow.price : null
         }
       />
       {product.shippingIncluded && <p>Kargo dahil</p>}

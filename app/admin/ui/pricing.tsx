@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { pricingSchema, type PricingSettings } from "@/lib/pricing";
 import { FormEnd, useSave } from "./shared";
+import { SizePrices } from "./size-prices";
+import { selectionRows } from "@/lib/size-pricing";
 
 export function PricingForm({
   initial,
@@ -25,12 +27,33 @@ export function PricingForm({
       className="admin-form"
       onSubmit={(e) => {
         e.preventDefault();
-        const parsed = pricingSchema.safeParse(value);
+        const parsed = pricingSchema.safeParse({
+          ...value,
+          builderSetPrices: value.builderSetPrices ?? [
+            ...selectionRows("set", "rectangle", value, value.builderSetPrice),
+            ...selectionRows("set", "circle", value, value.builderSetPrice),
+          ],
+          builderClockPrices: value.builderClockPrices ?? [
+            ...selectionRows(
+              "saat",
+              "rectangle",
+              value,
+              value.builderClockPrice,
+            ),
+            ...selectionRows("saat", "circle", value, value.builderClockPrice),
+          ],
+        });
         if (!parsed.success) {
           setValidation(parsed.error.issues.map((i) => i.message).join(" "));
           return;
         }
         setValidation("");
+        if (
+          !window.confirm(
+            "Fiyatlandırma değişikliklerini kaydetmek istediğinize emin misiniz?",
+          )
+        )
+          return;
         void save(
           "pricing",
           { version, data: parsed.data },
@@ -42,20 +65,63 @@ export function PricingForm({
         disabled={busy}
         style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
       >
-        <h2>Kendin Oluştur · Standart Fiyatlar</h2>
-        <div className="admin-two">
-          {([
-            ["builderSetPrice", "Tablo ve saat seti (₺)"],
-            ["builderClockPrice", "Tek saat (₺)"],
-          ] as const).map(([key, label]) => (
-            <label key={key}>
-              {label}
-              <input type="number" min="0.01" max="10000000" step="0.01"
-                value={value[key] ?? ""} placeholder="Tanımlanmadı"
-                onChange={(e) => field(key, e.target.value === "" ? null : Number(e.target.value))} />
-            </label>
-          ))}
-        </div>
+        <h2>Kendin Oluştur · Set ölçü fiyatları</h2>
+        <SizePrices
+          kind="set"
+          shape="rectangle"
+          bothShapes
+          settings={value}
+          rows={
+            value.builderSetPrices ?? [
+              ...selectionRows(
+                "set",
+                "rectangle",
+                value,
+                value.builderSetPrice,
+              ),
+              ...selectionRows("set", "circle", value, value.builderSetPrice),
+            ]
+          }
+          onChange={(rows) =>
+            setValue((v) => ({
+              ...v,
+              builderSetPrices: rows,
+              builderSetPrice:
+                rows.find((row) => row.price !== null)?.price ?? null,
+            }))
+          }
+        />
+        <h2>Kendin Oluştur · Tek saat ölçü fiyatları</h2>
+        <SizePrices
+          kind="saat"
+          shape="rectangle"
+          bothShapes
+          settings={value}
+          rows={
+            value.builderClockPrices ?? [
+              ...selectionRows(
+                "saat",
+                "rectangle",
+                value,
+                value.builderClockPrice,
+              ),
+              ...selectionRows(
+                "saat",
+                "circle",
+                value,
+                value.builderClockPrice,
+              ),
+            ]
+          }
+          onChange={(rows) =>
+            setValue((v) => ({
+              ...v,
+              builderClockPrices: rows,
+              builderClockPrice:
+                rows.find((row) => row.price !== null)?.price ?? null,
+            }))
+          }
+        />
         <h2>Özel Ölçü · Metrekare Birim Fiyatları</h2>
         <div className="admin-two">
           {(
@@ -117,7 +183,8 @@ export function PricingForm({
               <div className="admin-size-row" key={i}>
                 {(["width", "height"] as const).map((axis) => (
                   <label key={axis}>
-                    {axis === "width" ? "En" : "Boy"}{i === 0 ? " · Varsayılan" : ""}
+                    {axis === "width" ? "En" : "Boy"}
+                    {i === 0 ? " · Varsayılan" : ""}
                     <input
                       aria-label={`${title} ${i + 1} ${axis === "width" ? "en" : "boy"}`}
                       type="number"

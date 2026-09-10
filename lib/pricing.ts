@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  sizePriceRowsSchema,
+  validateSizeRows,
+  findSizePrice,
+  type PricedSelection,
+} from "./size-pricing";
 
 const cm = z
   .number()
@@ -25,6 +31,8 @@ export const pricingSchema = z
     clockRate: rate,
     builderSetPrice: rate.default(null),
     builderClockPrice: rate.default(null),
+    builderSetPrices: sizePriceRowsSchema.optional(),
+    builderClockPrices: sizePriceRowsSchema.optional(),
     minCm: cm,
     maxCm: cm,
     panelPresets: z.array(rectangleSchema).min(1).max(12),
@@ -33,6 +41,12 @@ export const pricingSchema = z
   })
   .strict()
   .superRefine((v, ctx) => {
+    if (v.builderSetPrices)
+      validateSizeRows(v.builderSetPrices, "set", ctx, ["builderSetPrices"]);
+    if (v.builderClockPrices)
+      validateSizeRows(v.builderClockPrices, "saat", ctx, [
+        "builderClockPrices",
+      ]);
     if (v.minCm > v.maxCm)
       ctx.addIssue({
         code: "custom",
@@ -125,7 +139,11 @@ export type PricingMode = z.infer<typeof pricingModeSchema>;
 export type MeasurementModes = { panel: PricingMode; clock: PricingMode };
 export const configurationSchema = z.discriminatedUnion("source", [
   z
-    .object({ source: z.literal("product"), dimensions: dimensionsSchema, pricingMode: pricingModeSchema.optional() })
+    .object({
+      source: z.literal("product"),
+      dimensions: dimensionsSchema,
+      pricingMode: pricingModeSchema.optional(),
+    })
     .strict(),
   z
     .object({
@@ -141,30 +159,90 @@ export const configurationSchema = z.discriminatedUnion("source", [
     .strict(),
 ]);
 export type Configuration = z.infer<typeof configurationSchema>;
-export function isStandardSize(kind: MeasuredType, dimensions: Dimensions, shape: ClockShape, settings: PricingSettings) {
+export function isStandardSize(
+  kind: MeasuredType,
+  dimensions: Dimensions,
+  shape: ClockShape,
+  settings: PricingSettings,
+) {
   const matches = (sizes: Dimensions["panel"][], size: Dimensions["panel"]) =>
     sizes.some((s) => s.width === size.width && s.height === size.height);
-  return (kind === "saat" || matches(settings.panelPresets, dimensions.panel)) &&
-    (kind === "tablo" || (shape === "circle"
-      ? dimensions.clock.width === dimensions.clock.height && settings.diameterPresets.includes(dimensions.clock.width)
-      : matches(settings.clockPresets, dimensions.clock)));
+  return (
+    (kind === "saat" || matches(settings.panelPresets, dimensions.panel)) &&
+    (kind === "tablo" ||
+      (shape === "circle"
+        ? dimensions.clock.width === dimensions.clock.height &&
+          settings.diameterPresets.includes(dimensions.clock.width)
+        : matches(settings.clockPresets, dimensions.clock)))
+  );
 }
 
-export function selectedPricingMode(kind: MeasuredType, modes: MeasurementModes): PricingMode {
-  return (kind !== "saat" && modes.panel === "custom") || (kind !== "tablo" && modes.clock === "custom") ? "custom" : "standard";
+export function selectedPricingMode(
+  kind: MeasuredType,
+  modes: MeasurementModes,
+): PricingMode {
+  return (kind !== "saat" && modes.panel === "custom") ||
+    (kind !== "tablo" && modes.clock === "custom")
+    ? "custom"
+    : "standard";
 }
 
 export function calculateSelectionPrice(
-  kind: MeasuredType, dimensions: Dimensions, shape: ClockShape, settings: PricingSettings,
-  product: { price?: number | null; salePrice?: number | null }, mode?: PricingMode,
-): ReturnType<typeof calculatePrice> | { price: number; error: null; panelArea?: undefined; clockArea?: undefined; panelPrice?: undefined; clockPrice?: undefined } {
+  kind: MeasuredType,
+  dimensions: Dimensions,
+  shape: ClockShape,
+  settings: PricingSettings,
+  product: PricedSelection,
+  mode?: PricingMode,
+):
+  | ReturnType<typeof calculatePrice>
+  | {
+      price: number;
+      error: null;
+      panelArea?: undefined;
+      clockArea?: undefined;
+      panelPrice?: undefined;
+      clockPrice?: undefined;
+    } {
   if (!dimensionsSchema.safeParse(dimensions).success)
     return { price: null, error: "Geçerli bir ölçü girin (cm)." };
   const standard = isStandardSize(kind, dimensions, shape, settings);
+  if (product.measurementPricing) {
+    if (standard) {
+      const row = findSizePrice(
+        product.measurementPricing.rows,
+        kind,
+        shape,
+        dimensions,
+      );
+      const price = row?.salePrice ?? row?.price;
+      return typeof price === "number" && price > 0
+        ? { price, error: null }
+        : {
+            price: null,
+            error: "Bu ölçü seçimi için fiyat henüz tanımlanmadı.",
+          };
+    }
+    if (mode === "standard")
+      return {
+        price: null,
+        error: "Hazır ölçüyü yeniden seçin veya özel ölçü kullanın.",
+      };
+    return calculatePrice(kind, dimensions, shape, {
+      ...settings,
+      panelRate: product.measurementPricing.panelRate,
+      clockRate: product.measurementPricing.clockRate,
+    });
+  }
+
   // Old carts have no mode: infer from the current presets, never trust a standard flag for arbitrary dimensions.
   if (mode === "custom" || (mode === undefined && !standard))
     return calculatePrice(kind, dimensions, shape, settings);
-  if (!standard) return { price: null, error: "Hazır ölçüyü yeniden seçin veya özel ölçü kullanın." };
+  if (!standard)
+    return {
+      price: null,
+      error: "Hazır ölçüyü yeniden seçin veya özel ölçü kullanın.",
+    };
   const price = product.salePrice ?? product.price;
   return typeof price === "number" && Number.isFinite(price) && price > 0
     ? { price, error: null }

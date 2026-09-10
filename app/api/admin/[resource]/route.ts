@@ -12,7 +12,8 @@ import {
   requireAdmin,
 } from "@/lib/admin/auth";
 import { failure } from "@/lib/admin/http";
-import { pricingSchema } from "@/lib/pricing";
+import { pricingSchema, initialPricing, clockShapeFor } from "@/lib/pricing";
+import { canonicalProductPrice } from "@/lib/size-pricing";
 import {
   categorySchema,
   contentSchema,
@@ -37,7 +38,41 @@ export async function POST(request: Request, context: Context) {
     const id = body.id || randomUUID();
     await db().begin(async (tx) => {
       if (resource === "products") {
-        const data = productSaveSchema.parse(body.data);
+        let data = productSaveSchema.parse(body.data);
+        if (!data.measurementPricing && body.id) {
+          const [previous] =
+            await tx`SELECT data FROM woya_products WHERE id=${z.uuid().parse(id)}`;
+          if (previous?.data.measurementPricing) {
+            if (
+              previous.data.price !== data.price ||
+              previous.data.salePrice !== data.salePrice
+            )
+              throw new HttpError(
+                409,
+                "Ölçü fiyatlarını düzenlemek için ürün sayfasını yenileyin.",
+              );
+            data = {
+              ...data,
+              measurementPricing: previous.data.measurementPricing,
+            };
+          }
+        }
+        if (data.measurementPricing && data.type !== "rehber") {
+          const [record] =
+            await tx`SELECT data FROM woya_content WHERE id='pricing'`;
+          const settings = record
+            ? pricingSchema.parse(record.data)
+            : initialPricing;
+          const prices = canonicalProductPrice(
+            data.type,
+            clockShapeFor(data),
+            settings,
+            data,
+          );
+          if (prices.price === null)
+            throw new HttpError(400, "En az bir hazır ölçü fiyatı girin.");
+          data = { ...data, ...prices };
+        }
         const [category] =
           await tx`SELECT data FROM woya_categories WHERE id=${data.categoryId}`;
         if (category && !category.data.active)

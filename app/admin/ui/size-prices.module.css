@@ -1,0 +1,46 @@
+.section {
+  min-width: 0;
+  margin: 16px 0 24px;
+}
+.rows {
+  border-top: 1px solid #dcdde0;
+  max-height: 580px;
+  overflow-y: auto;
+  padding-right: 8px;
+  overscroll-behavior: contain;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) repeat(2, minmax(100px, 1fr));
+  gap: 14px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #dcdde0;
+}
+.row label {
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+}
+.row input {
+  width: 100%;
+  min-width: 0;
+}
+.size {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.size small {
+  display: block;
+  color: #666;
+  font-size: 11px;
+}
+@media (max-width: 650px) {
+  .row {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .size {
+    grid-column: 1/-1;
+  }
+}

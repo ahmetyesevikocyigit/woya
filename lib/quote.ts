@@ -1,4 +1,9 @@
 import {
+  builderPriceConfig,
+  type MeasurementPricing,
+  type PricedSelection,
+} from "./size-pricing";
+import {
   calculateSelectionPrice,
   clockShapeFor,
   configurationSchema,
@@ -12,6 +17,7 @@ import { builderCatalog } from "./builder-catalog";
 export type QuoteProduct = {
   builderParts?: import("./builder-catalog").BuilderAssets;
   shippingIncluded?: boolean;
+  measurementPricing?: MeasurementPricing;
   slug: string;
   code: string;
   title: string;
@@ -50,7 +56,7 @@ export function quoteItem(
   let shape: ClockShape;
   let extra: string[] = [];
   let shippingIncluded = false;
-  let standardPrice: { price?: number | null; salePrice?: number | null };
+  let standardPrice: PricedSelection;
   if (c.source === "product") {
     const product = products.find((p) => p.slug === item.slug);
     if (!product || !product.productType || product.productType === "rehber")
@@ -79,10 +85,7 @@ export function quoteItem(
     shippingIncluded = clock.shippingIncluded === true;
     kind = c.kind;
     shape = clockShapeFor(clock);
-    standardPrice = {
-      price:
-        kind === "set" ? settings.builderSetPrice : settings.builderClockPrice,
-    };
+    standardPrice = builderPriceConfig(kind, settings);
     extra = [
       `Saat modeli: ${clock.title}`,
       `Rakam: ${{ romen: "Romen", normal: "Normal", minimal: "Minimal", original: "Fotoğraftaki kadran" }[c.numeral]}`,
