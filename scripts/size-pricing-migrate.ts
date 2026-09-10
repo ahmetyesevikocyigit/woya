@@ -43,7 +43,7 @@ async function main() {
         const next = upgradeProductPricing(p, settings);
         if (next === p) continue;
         await tx.unsafe(
-          "UPDATE woya_products SET data=$1,version=version+1,updated_at=now() WHERE id=$2",
+          "UPDATE woya_products SET data=$1::text::jsonb,version=version+1,updated_at=now() WHERE id=$2",
           [JSON.stringify({ ...row.data, measurementPricing: next.measurementPricing }), row.id],
         );
         await tx.unsafe(
@@ -55,7 +55,7 @@ async function main() {
       const next = upgradeBuilderPricing(settings, 7500);
       if (JSON.stringify(next) !== JSON.stringify(settings)) {
         await tx.unsafe(
-          "INSERT INTO woya_content(id,data) VALUES('pricing',$1) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,version=woya_content.version+1",
+          "INSERT INTO woya_content(id,data) VALUES('pricing',$1::text::jsonb) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,version=woya_content.version+1",
           [JSON.stringify({
             ...(pricing[0]?.data ?? settings),
             builderSetPrice: next.builderSetPrice,
