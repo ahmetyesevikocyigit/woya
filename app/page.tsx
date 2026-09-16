@@ -153,6 +153,18 @@ export default async function Home() {
         </div>
       </section>
 
+      <section
+        className="section other-products-section"
+        id="diger-urunler"
+        aria-labelledby="other-products-title"
+      >
+        <div className="other-products-heading">
+          <h2 id="other-products-title">Tüm Ürünler</h2>
+        </div>
+
+        <ProductGrid expandable products={woyaProducts} />
+      </section>
+
       <CustomBuilder
         settings={await getPricing()}
         availableModels={woyaProducts.map(
@@ -165,18 +177,6 @@ export default async function Home() {
           }),
         )}
       />
-
-      <section
-        className="section other-products-section"
-        id="diger-urunler"
-        aria-labelledby="other-products-title"
-      >
-        <div className="other-products-heading">
-          <h2 id="other-products-title">Tüm Ürünler</h2>
-        </div>
-
-        <ProductGrid expandable products={woyaProducts} />
-      </section>
 
       <FaqSection items={content.faqs} />
       <SiteFooter />

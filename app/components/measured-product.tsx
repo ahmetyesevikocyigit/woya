@@ -1,6 +1,8 @@
 "use client";
 import { initialSelectionDimensions, findSizePrice } from "@/lib/size-pricing";
 import { useState } from "react";
+import Link from "next/link";
+import styles from "./measurement-controls.module.css";
 import type { WoyaProduct } from "../data/products";
 import {
   calculateSelectionPrice,
@@ -69,16 +71,23 @@ export function MeasuredProduct({
         }
       />
       {product.shippingIncluded && <p>Kargo dahil</p>}
-      <AddToCartButton
-        className="product-detail-primary"
-        disabled={result.price === null}
-        product={{
-          slug: product.slug,
-          title: product.title,
-          image: product.image,
-          configuration: { source: "product", dimensions, pricingMode },
-        }}
-      />
+      <div className={styles.purchaseActions}>
+        <div>
+          <AddToCartButton
+            className="product-detail-primary"
+            disabled={result.price === null}
+            product={{
+              slug: product.slug,
+              title: product.title,
+              image: product.image,
+              configuration: { source: "product", dimensions, pricingMode },
+            }}
+          />
+        </div>
+        <Link className="product-detail-secondary" href="/#kendi-tasariminiz">
+          Özelleştir
+        </Link>
+      </div>
     </>
   );
 }

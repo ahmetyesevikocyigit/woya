@@ -2,7 +2,7 @@
 import { builderPriceConfig, findSizePrice } from "@/lib/size-pricing";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   Clock3,
@@ -298,6 +298,18 @@ function AvailableBuilder({
   availableModels: BuilderModel[];
   settings: PricingSettings;
 }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    // The streamed homepage may reveal this section after native hash scrolling.
+    if (window.location.hash !== "#kendi-tasariminiz") return;
+    const frame = window.requestAnimationFrame(() => {
+      sectionRef.current?.scrollIntoView({
+        behavior: "instant",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
   const [mode, setMode] = useState<BuilderMode>(
     tableSetSources.length ? "set" : "clock",
   );
@@ -458,6 +470,7 @@ function AvailableBuilder({
   return (
     <section
       className={`custom-builder-section product-mixer-section ${styles.studio}`}
+      ref={sectionRef}
       id="kendi-tasariminiz"
       aria-labelledby="custom-builder-title"
     >
