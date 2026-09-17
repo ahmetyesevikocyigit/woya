@@ -71,3 +71,24 @@ test("closed requests and cancelled orders cannot be reopened", () => {
   assert.deepEqual(orderTransitions.iptal, []);
   assert.ok(!orderTransitions.kargoda.includes("iptal"));
 });
+
+test("Account cart merging preserves Roman and normal numerals separately", () => {
+  const roman: AccountCartItem = {
+    ...item,
+    configuration: { ...item.configuration!, numeral: "romen" },
+  };
+  const normal: AccountCartItem = {
+    ...item,
+    configuration: { ...item.configuration!, numeral: "normal" },
+  };
+  const merged = mergeItems([roman], [normal, roman]);
+  assert.equal(merged.length, 2);
+  assert.equal(
+    merged.find((i) => i.configuration?.numeral === "romen")?.quantity,
+    4,
+  );
+  assert.equal(
+    merged.find((i) => i.configuration?.numeral === "normal")?.quantity,
+    2,
+  );
+});

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Search, Crop } from "lucide-react";
 import {
   productSaveSchema,
@@ -11,7 +11,7 @@ import {
   type ProductRecord,
 } from "@/lib/admin/schema";
 import { ImageEditor } from "./images";
-import { SizePrices } from "./size-prices";
+import { SizePrices, type SizePricesHandle } from "./size-prices";
 import { selectionRows, canonicalProductPrice } from "@/lib/size-pricing";
 import { clockShapeFor, type PricingSettings } from "@/lib/pricing";
 import { Empty, FormEnd, money, useSave } from "./shared";
@@ -230,7 +230,7 @@ export function ProductForm({
     }));
   }
   const [cropping, setCropping] = useState(false);
-  const [pendingSize, setPendingSize] = useState(false);
+  const sizePricesRef = useRef<SizePricesHandle>(null);
   const { busy, error, save } = useSave();
   const [validationError, setValidationError] = useState("");
   function field<K extends keyof ProductInput>(name: K, next: ProductInput[K]) {
@@ -242,20 +242,23 @@ export function ProductForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (cropping || busy) return;
-        if (pendingSize) {
-          setValidationError(
-            "Seçtiğiniz ölçüyü önce Ekle/Güncelle ile listeye alın veya Vazgeç düğmesine basın.",
-          );
+        const rows = kind ? sizePricesRef.current?.rowsForSave() : undefined;
+        if (rows === null) {
+          setValidationError("Ölçü fiyatını kontrol edin.");
           return;
         }
+        const savedMeasurementPricing = {
+          ...measurementPricing,
+          rows: rows ?? measurementPricing.rows,
+        };
         const parsed = productSaveSchema.safeParse(
           kind
             ? {
                 ...value,
-                measurementPricing,
+                measurementPricing: savedMeasurementPricing,
                 ...canonicalProductPrice(kind, shape, pricing, {
                   ...value,
-                  measurementPricing,
+                  measurementPricing: savedMeasurementPricing,
                 }),
               }
             : value,
@@ -392,7 +395,7 @@ export function ProductForm({
               <h2>Ölçülere göre fiyatlar</h2>
               <SizePrices
                 key={kind + ":" + shape}
-                onDraftChange={setPendingSize}
+                ref={sizePricesRef}
                 kind={kind}
                 shape={shape}
                 settings={pricing}

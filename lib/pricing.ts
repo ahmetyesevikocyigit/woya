@@ -141,6 +141,7 @@ export const configurationSchema = z.discriminatedUnion("source", [
   z
     .object({
       source: z.literal("product"),
+      numeral: z.enum(["romen", "normal"]).optional(),
       dimensions: dimensionsSchema,
       pricingMode: pricingModeSchema.optional(),
     })

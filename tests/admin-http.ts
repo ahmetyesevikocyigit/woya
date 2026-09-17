@@ -706,11 +706,13 @@ async function main() {
       "UPDATE woya_products SET data=jsonb_set(data,'{active}','false') WHERE id=$1",
       [id],
     );
+    const inactiveProductHtml = await (
+      await fetch(`${base}/urunler/${product.slug}`)
+    ).text();
     check(
-      (await (await fetch(`${base}/urunler/${product.slug}`)).text()).includes(
-        "Güncel HTTP Ürünü",
-      ),
-      "Repeated storefront reads reuse cached catalogue data",
+      !inactiveProductHtml.includes("Güncel HTTP Ürünü") &&
+        inactiveProductHtml.includes("Aradığınız sayfa bulunamadı."),
+      "Storefront immediately reflects current admin data without a persistent catalog cache",
     );
     const closedQuote = await (
       await api("/api/sepet/fiyat", {
@@ -728,7 +730,7 @@ async function main() {
     ).json();
     check(
       closedQuote.quotes[0].price === null,
-      "Live cart validation rejects inactive products even with a warm display cache",
+      "Storefront and cart both reject inactive products",
     );
     await pg.query(
       "UPDATE woya_products SET data=jsonb_set(jsonb_set(data,'{active}','true'),'{stock}','0') WHERE id=$1",

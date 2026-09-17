@@ -35,6 +35,7 @@ export function MeasuredProduct({
       : defaultDimensions(settings, shape),
   );
   const kind = product.productType;
+  const [numeral, setNumeral] = useState<"romen" | "normal">("romen");
   const [modes, setModes] = useState<MeasurementModes>({
     panel: "standard",
     clock: "standard",
@@ -63,6 +64,20 @@ export function MeasuredProduct({
         modes={modes}
         onModesChange={setModes}
       />
+      {kind !== "tablo" && (
+        <label className={`${styles.field} ${styles.numeralField}`}>
+          Saat rakamı
+          <select
+            value={numeral}
+            onChange={(event) =>
+              setNumeral(event.target.value as "romen" | "normal")
+            }
+          >
+            <option value="romen">Romen rakam</option>
+            <option value="normal">Normal rakam</option>
+          </select>
+        </label>
+      )}
       <PriceSummary
         result={result}
         kind={kind}
@@ -80,7 +95,12 @@ export function MeasuredProduct({
               slug: product.slug,
               title: product.title,
               image: product.image,
-              configuration: { source: "product", dimensions, pricingMode },
+              configuration: {
+                source: "product",
+                dimensions,
+                pricingMode,
+                ...(kind !== "tablo" ? { numeral } : {}),
+              },
             }}
           />
         </div>

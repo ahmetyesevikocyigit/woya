@@ -115,3 +115,9 @@
 .purchaseActions svg {
   flex-shrink: 0;
 }
+
+.numeralField {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}

@@ -84,14 +84,11 @@ export async function readCatalog() {
   ]);
   return { products, categories, pricing: pricing.data };
 }
-const cachedCatalog = unstable_cache(
-  readCatalog,
-  ["woya-catalog-v1", cacheScope],
-  { tags: [storefrontCacheTag], revalidate: 300 },
-);
+// Prices and availability must use the same live database as cart validation.
+// React cache deduplicates within one request, without retaining old admin values.
 export const getStorefrontCatalog = cache(async () => {
   await connection();
-  return cachedCatalog();
+  return readCatalog();
 });
 const cachedContent = unstable_cache(
   async () => (await readContentRecord()).data,

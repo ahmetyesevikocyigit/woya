@@ -681,3 +681,68 @@ test("Size table migration preserves edited rows and is repeatable without inven
   assert.deepEqual(upgradeBuilderPricing(s, 7500), s);
   assert.equal(s.panelRate, null);
 });
+
+test("Ready clock numeral selections are validated, quoted and kept as distinct cart lines", () => {
+  for (const productType of ["set", "saat"] as const) {
+    const product: QuoteProduct = {
+      slug: productType,
+      code: "01",
+      title: "Saat",
+      productType,
+      clockShape: "rectangle",
+      price: 3456,
+    };
+    const make = (numeral?: "romen" | "normal") => ({
+      slug: productType,
+      quantity: 1,
+      configuration: {
+        source: "product" as const,
+        dimensions,
+        pricingMode: "standard" as const,
+        ...(numeral ? { numeral } : {}),
+      },
+    });
+    const roman = make("romen"),
+      normal = make("normal"),
+      legacy = make();
+    for (const item of [roman, normal, legacy]) {
+      assert.equal(
+        configurationSchema.safeParse(item.configuration).success,
+        true,
+      );
+      assert.equal(quoteItem(item, [product], settings).price, 3456);
+    }
+    assert.ok(
+      quoteItem(roman, [product], settings).options.includes("Rakam: Romen"),
+    );
+    assert.ok(
+      quoteItem(normal, [product], settings).options.includes("Rakam: Normal"),
+    );
+    assert.ok(
+      !quoteItem(legacy, [product], settings).options.some((o) =>
+        o.startsWith("Rakam:"),
+      ),
+    );
+    assert.notEqual(cartKey(roman), cartKey(normal));
+    assert.notEqual(cartKey(roman), cartKey(legacy));
+    assert.equal(
+      configurationSchema.safeParse({
+        ...roman.configuration,
+        numeral: "minimal",
+      }).success,
+      false,
+    );
+  }
+  assert.equal(
+    quoteItem(
+      {
+        slug: "tablo",
+        quantity: 1,
+        configuration: { source: "product", dimensions, numeral: "normal" },
+      },
+      products,
+      settings,
+    ).price,
+    null,
+  );
+});

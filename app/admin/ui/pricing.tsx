@@ -1,9 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { pricingSchema, type PricingSettings } from "@/lib/pricing";
 import { FormEnd, useSave } from "./shared";
-import { SizePrices } from "./size-prices";
+import { SizePrices, type SizePricesHandle } from "./size-prices";
 import { selectionRows } from "@/lib/size-pricing";
 
 export function PricingForm({
@@ -15,8 +15,8 @@ export function PricingForm({
 }) {
   const [value, setValue] = useState(initial);
   const [validation, setValidation] = useState("");
-  const [pendingSet, setPendingSet] = useState(false);
-  const [pendingClock, setPendingClock] = useState(false);
+  const setPricesRef = useRef<SizePricesHandle>(null);
+  const clockPricesRef = useRef<SizePricesHandle>(null);
   const { busy, error, save } = useSave();
   function field<K extends keyof PricingSettings>(
     key: K,
@@ -29,27 +29,45 @@ export function PricingForm({
       className="admin-form"
       onSubmit={(e) => {
         e.preventDefault();
-        if (pendingSet || pendingClock) {
-          setValidation(
-            "Seçtiğiniz ölçüyü önce Ekle/Güncelle ile listeye alın veya Vazgeç düğmesine basın.",
-          );
+        const setRows = setPricesRef.current?.rowsForSave();
+        const clockRows = clockPricesRef.current?.rowsForSave();
+        if (setRows === null || clockRows === null) {
+          setValidation("Ölçü fiyatını kontrol edin.");
           return;
         }
         const parsed = pricingSchema.safeParse({
           ...value,
-          builderSetPrices: value.builderSetPrices ?? [
-            ...selectionRows("set", "rectangle", value, value.builderSetPrice),
-            ...selectionRows("set", "circle", value, value.builderSetPrice),
-          ],
-          builderClockPrices: value.builderClockPrices ?? [
-            ...selectionRows(
-              "saat",
-              "rectangle",
-              value,
-              value.builderClockPrice,
-            ),
-            ...selectionRows("saat", "circle", value, value.builderClockPrice),
-          ],
+          builderSetPrice:
+            setRows?.find((row) => row.price !== null)?.price ??
+            value.builderSetPrice,
+          builderClockPrice:
+            clockRows?.find((row) => row.price !== null)?.price ??
+            value.builderClockPrice,
+          builderSetPrices: setRows ??
+            value.builderSetPrices ?? [
+              ...selectionRows(
+                "set",
+                "rectangle",
+                value,
+                value.builderSetPrice,
+              ),
+              ...selectionRows("set", "circle", value, value.builderSetPrice),
+            ],
+          builderClockPrices: clockRows ??
+            value.builderClockPrices ?? [
+              ...selectionRows(
+                "saat",
+                "rectangle",
+                value,
+                value.builderClockPrice,
+              ),
+              ...selectionRows(
+                "saat",
+                "circle",
+                value,
+                value.builderClockPrice,
+              ),
+            ],
         });
         if (!parsed.success) {
           setValidation(parsed.error.issues.map((i) => i.message).join(" "));
@@ -75,7 +93,7 @@ export function PricingForm({
       >
         <h2>Kendin Oluştur · Set ölçü fiyatları</h2>
         <SizePrices
-          onDraftChange={setPendingSet}
+          ref={setPricesRef}
           kind="set"
           shape="rectangle"
           bothShapes
@@ -102,7 +120,7 @@ export function PricingForm({
         />
         <h2>Kendin Oluştur · Tek saat ölçü fiyatları</h2>
         <SizePrices
-          onDraftChange={setPendingClock}
+          ref={clockPricesRef}
           kind="saat"
           shape="rectangle"
           bothShapes

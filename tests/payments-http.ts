@@ -163,6 +163,7 @@ async function main() {
       quantity: 1,
       configuration: {
         source: "product",
+        numeral: "normal" as const,
         pricingMode: "standard",
         dimensions: defaultDimensions(initialPricing, "rectangle"),
       },
@@ -500,7 +501,9 @@ async function main() {
     check(
       state.customer.address === customer.address &&
         state.items[0].title === product.title &&
-        state.items[0].configuration.dimensions.panel.width === 50,
+        state.items[0].configuration.dimensions.panel.width === 50 &&
+        state.items[0].configuration.numeral === "normal" &&
+        state.items[0].options.includes("Rakam: Normal"),
       "Owned payment retains canonical products, measurements and delivery address",
     );
     await pg.query(

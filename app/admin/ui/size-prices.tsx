@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useId, useState } from "react";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { useId, useImperativeHandle, useState, type Ref } from "react";
+import { Pencil, Trash2, Plus, Save } from "lucide-react";
 import {
   dimensionLabel,
   type ClockShape,
@@ -17,22 +17,26 @@ import {
 import { money } from "./shared";
 import styles from "./size-prices.module.css";
 
+export type SizePricesHandle = {
+  rowsForSave: () => SizePriceRow[] | null;
+};
+
 export function SizePrices({
+  ref,
   kind,
   shape,
   settings,
   rows,
   onChange,
-  onDraftChange,
   bothShapes = false,
   product = false,
 }: {
+  ref?: Ref<SizePricesHandle>;
   kind: MeasuredType;
   shape: ClockShape;
   settings: PricingSettings;
   rows: SizePriceRow[];
   onChange: (rows: SizePriceRow[]) => void;
-  onDraftChange: (pending: boolean) => void;
   bothShapes?: boolean;
   product?: boolean;
 }) {
@@ -80,10 +84,7 @@ export function SizePrices({
   const added = displayed.filter((row) => row.price !== null);
   const choice = displayed.find((row) => keyOf(row) === selected);
   const editing = choice?.price !== null && choice?.price !== undefined;
-  useEffect(() => {
-    onDraftChange(Boolean(choice));
-    return () => onDraftChange(false);
-  }, [selected, Boolean(choice), onDraftChange]);
+  useImperativeHandle(ref, () => ({ rowsForSave }));
   function reset() {
     setSelected("");
     setSelectedPanel("");
@@ -112,8 +113,8 @@ export function SizePrices({
     );
     select(row ? keyOf(row) : "", false);
   }
-  function commit() {
-    if (!choice) return;
+  function rowsForSave(): SizePriceRow[] | null {
+    if (!choice) return rows;
     const parsed = sizePriceRowSchema.safeParse({
       ...choice,
       price: price.trim() === "" ? null : Number(price),
@@ -125,9 +126,15 @@ export function SizePrices({
           ? parsed.error.issues.map((i) => i.message).join(" ")
           : "Bu ölçü için toplam fiyat girin.",
       );
-      return;
+      return null;
     }
-    onChange([...rows.filter((row) => keyOf(row) !== selected), parsed.data]);
+    return [...rows.filter((row) => keyOf(row) !== selected), parsed.data];
+  }
+  function commit() {
+    if (!choice) return;
+    const next = rowsForSave();
+    if (!next) return;
+    onChange(next);
     setNotice(
       editing
         ? "Ölçü listede güncellendi. Yayınlamak için değişiklikleri kaydedin."
@@ -262,9 +269,12 @@ export function SizePrices({
             </p>
           )}
           <div className={styles.actions}>
-            <button type="button" className="admin-primary" onClick={commit}>
+            <button type="submit" className="admin-primary">
+              <Save size={15} /> Fiyatı kaydet
+            </button>
+            <button type="button" onClick={commit}>
               {editing ? <Pencil size={15} /> : <Plus size={15} />}
-              {editing ? "Güncelle" : "Ekle"}
+              {editing ? "Listeye uygula" : "Ekle"}
             </button>
             <button type="button" onClick={reset}>
               Vazgeç

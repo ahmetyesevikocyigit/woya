@@ -62,6 +62,10 @@ export function quoteItem(
     if (!product || !product.productType || product.productType === "rehber")
       return fail("Ürün satışa açık değil.");
     kind = product.productType;
+    if (c.numeral) {
+      if (kind === "tablo") return fail("Bu ürün için saat rakamı seçilemez.");
+      extra.push(`Rakam: ${c.numeral === "romen" ? "Romen" : "Normal"}`);
+    }
     shape = clockShapeFor(product);
     standardPrice = product;
     shippingIncluded = product.shippingIncluded === true;

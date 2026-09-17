@@ -14,6 +14,8 @@ export function cartKey(item: { slug: string; configuration?: Configuration }) {
     d.clock.height,
     ...(c.source === "builder"
       ? [c.kind, c.left ?? "", c.clock, c.right ?? "", c.numeral]
-      : []),
+      : c.numeral
+        ? [c.numeral]
+        : []),
   ]);
 }
