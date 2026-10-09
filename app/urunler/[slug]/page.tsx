@@ -159,27 +159,34 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           </article>
         </div>
 
-        <section
-          className="product-detail-longform"
-          aria-labelledby="product-detail-longform-title"
-        >
-          <div>
-            <h2 id="product-detail-longform-title">
-              {product.title} hangi alanlara yakışır?
-            </h2>
-          </div>
-          <p>
-            {product.title}, özellikle {product.room.toLocaleLowerCase("tr-TR")}{" "}
-            için dengeli bir odak oluşturacak şekilde değerlendirilebilir.{" "}
-            {product.tone} tonları, mobilya ve duvar rengiyle birlikte
-            düşünüldüğünde ürünün cam yüzey etkisi daha net görünür.
-          </p>
-          <ul>
-            {product.highlights.map((highlight) => (
-              <li key={highlight}>{highlight}</li>
-            ))}
-          </ul>
-        </section>
+        {(product.tone.trim() || product.highlights.length > 0) && (
+          <section
+            className="product-detail-longform"
+            aria-labelledby="product-detail-longform-title"
+          >
+            <div>
+              <h2 id="product-detail-longform-title">
+                {product.title} hangi alanlara yakışır?
+              </h2>
+            </div>
+            {product.tone.trim() && (
+              <p>
+                {product.title}, özellikle{" "}
+                {product.room.toLocaleLowerCase("tr-TR")} için dengeli bir odak
+                oluşturacak şekilde değerlendirilebilir. {product.tone} tonları,
+                mobilya ve duvar rengiyle birlikte düşünüldüğünde ürünün cam
+                yüzey etkisi daha net görünür.
+              </p>
+            )}
+            {product.highlights.length > 0 && (
+              <ul>
+                {product.highlights.map((highlight) => (
+                  <li key={highlight}>{highlight}</li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
 
         {relatedProducts.length ? (
           <section
