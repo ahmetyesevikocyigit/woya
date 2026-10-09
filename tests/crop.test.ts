@@ -54,7 +54,7 @@ test("Product schema persists complete crops; incomplete sets and arbitrary URLs
   assert.equal(productSchema.safeParse(product).success, true);
   assert.equal(builderPartsSchema.safeParse({ ...parts, right: undefined }).success, false);
   assert.equal(builderPartsSchema.safeParse({ ...parts, center: "http://localhost/private" }).success, false);
-  assert.equal(productSchema.safeParse({ ...product, type: "tablo" }).success, false);
+  assert.equal(productSchema.safeParse({ ...product, type: "tablo" }).success, true);
   assert.equal(productSchema.safeParse({ ...product, builderParts: { ...parts, enabled: false }, type: "tablo" }).success, true);
 });
 test("New product crops enter builder and quotes, while disabled and missing parts do not", () => {
@@ -70,4 +70,18 @@ test("New product crops enter builder and quotes, while disabled and missing par
   assert.equal(builderCatalog([{ ...model, builderParts: undefined }]).clocks.length, 0);
   assert.equal(builderCatalog([{ ...model, code: "01", builderParts: undefined }]).tables.length, 1);
   assert.equal(builderCatalog([{ ...model, code: "01", builderParts: { ...parts, enabled: false } }]).tables.length, 0);
+});
+
+// A decorative triptych contributes side panels, never a fake clock.
+test("Decorative table panels mix with real clocks and remain valid at checkout", () => {
+  const table = { code: "custom-table", title: "Üçlü tablo", slug: "uclu-tablo", productType: "tablo" as const, builderParts: parts };
+  const clock = { code: "custom-clock", title: "Saat", slug: "saat", productType: "saat" as const, builderParts: { enabled: true, center: url } };
+  const catalog = builderCatalog([table, clock]);
+  assert.deepEqual(catalog.tables.map((p) => p.code), [table.code]);
+  assert.deepEqual(catalog.clocks.map((p) => p.code), [clock.code]);
+  const item = { slug: "ozel-set", quantity: 1, configuration: { source: "builder", kind: "set", left: table.code, right: table.code, clock: clock.code, numeral: "original", dimensions: defaultDimensions(initialPricing, "rectangle"), pricingMode: "standard" } };
+  const settings = { ...initialPricing, builderSetPrice: 7500 };
+  assert.equal(quoteItem(item, [table, clock], settings).price, 7500);
+  assert.equal(quoteItem({ ...item, configuration: { ...item.configuration, clock: table.code } }, [table, clock], settings).price, null);
+  assert.equal(quoteItem(item, [{ ...table, builderParts: { ...parts, enabled: false } }, clock], settings).price, null);
 });

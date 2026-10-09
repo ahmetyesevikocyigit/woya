@@ -98,13 +98,13 @@ export function quoteItem(
       const left = products.find(
         (p) =>
           p.code === c.left &&
-          p.productType === "set" &&
+          (p.productType === "set" || p.productType === "tablo") &&
           tables.some((s) => s.code === p.code),
       );
       const right = products.find(
         (p) =>
           p.code === c.right &&
-          p.productType === "set" &&
+          (p.productType === "set" || p.productType === "tablo") &&
           tables.some((s) => s.code === p.code),
       );
       if (!left || !right)

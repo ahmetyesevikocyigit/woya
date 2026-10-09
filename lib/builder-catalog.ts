@@ -14,13 +14,13 @@ export type BuilderCatalogModel = {
 export function builderCatalog(models: BuilderCatalogModel[]) {
   const tables: SourceOption[] = [], clocks: SourceOption[] = [];
   for (const model of models) {
-    if (model.productType !== "set" && model.productType !== "saat") continue;
+    if (!["set", "saat", "tablo"].includes(model.productType ?? "")) continue;
     if (model.builderParts) {
       const parts = model.builderParts;
       if (!parts.enabled) continue;
-      const option = { code: model.code, name: model.title, motif: model.productType === "set" ? "Tablo seti" : "Saat", tone: "", parts };
-      if (parts.center) clocks.push(option);
-      if (model.productType === "set" && parts.left && parts.right) tables.push(option);
+      const option = { code: model.code, name: model.title, motif: model.productType === "saat" ? "Saat" : "Tablo seti", tone: "", parts };
+      if (model.productType !== "tablo" && parts.center) clocks.push(option);
+      if (model.productType !== "saat" && parts.left && parts.right) tables.push(option);
     } else {
       const clock = clockSources.find((s) => s.code === model.code);
       const table = tableSetSources.find((s) => s.code === model.code);

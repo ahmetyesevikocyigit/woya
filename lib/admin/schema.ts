@@ -79,7 +79,7 @@ export const productSchema = z
   .refine(
     (v) =>
       !v.builderParts?.enabled ||
-      (v.type === "set"
+      ((v.type === "set" || v.type === "tablo")
         ? Boolean(v.builderParts.left && v.builderParts.right)
         : v.type === "saat"),
     {

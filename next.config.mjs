@@ -4,6 +4,7 @@ const nextConfig = {
   compress: true,
   devIndicators: false,
   output: "standalone",
+  cacheMaxMemorySize: 16 * 1024 * 1024,
   outputFileTracingExcludes: {
     "/*": [
       "./.env*",
@@ -95,6 +96,8 @@ const nextConfig = {
     ],
   },
   experimental: {
+    imgOptConcurrency: 1,
+    imgOptOperationCache: false,
     optimizePackageImports: ["lucide-react"],
   },
 };
