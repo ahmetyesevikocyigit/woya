@@ -1,6 +1,6 @@
 "use client";
 import { useId, useImperativeHandle, useState, type Ref } from "react";
-import { Pencil, Trash2, Plus, Save } from "lucide-react";
+import { Pencil, Trash2, Plus } from "lucide-react";
 import {
   dimensionLabel,
   type ClockShape,
@@ -48,7 +48,7 @@ export function SizePrices({
   const [salePrice, setSalePrice] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const choices = bothShapes
     ? [
         ...selectionRows(kind, "rectangle", settings),
@@ -64,9 +64,14 @@ export function SizePrices({
       ? "Saat " +
         dimensionLabel(row.dimensions.clock, row.clockShape === "circle")
       : "");
-  const displayed = choices.map(
-    (row) => findSizePrice(rows, kind, row.clockShape, row.dimensions) ?? row,
-  );
+  const displayed = [
+    ...new Map(
+      [...choices, ...rows].map((row) => [
+        keyOf(row),
+        findSizePrice(rows, kind, row.clockShape, row.dimensions) ?? row,
+      ]),
+    ).values(),
+  ];
   const panelKey = (row: SizePriceRow) =>
     row.dimensions.panel.width + "x" + row.dimensions.panel.height;
   const clockKey = (row: SizePriceRow) =>
@@ -82,6 +87,10 @@ export function SizePrices({
     ...new Map(displayed.map((row) => [clockKey(row), row])).values(),
   ];
   const added = displayed.filter((row) => row.price !== null);
+  const defaultRow = choices.find(
+    (row) =>
+      findSizePrice(rows, kind, row.clockShape, row.dimensions)?.price != null,
+  );
   const choice = displayed.find((row) => keyOf(row) === selected);
   const editing = choice?.price !== null && choice?.price !== undefined;
   useImperativeHandle(ref, () => ({ rowsForSave }));
@@ -93,7 +102,16 @@ export function SizePrices({
     setSalePrice("");
     setError("");
   }
-  function select(key: string, updateParts = true) {
+  function select(key: string, updateParts = true): boolean {
+    if (
+      choice &&
+      (price !== (choice.price?.toString() ?? "") ||
+        salePrice !== (choice.salePrice?.toString() ?? ""))
+    ) {
+      const next = rowsForSave();
+      if (!next) return false;
+      onChange(next);
+    }
     const row = displayed.find((row) => keyOf(row) === key);
     setSelected(key);
     if (updateParts && kind === "set") {
@@ -104,14 +122,16 @@ export function SizePrices({
     setSalePrice(row?.salePrice?.toString() ?? "");
     setError("");
     setNotice("");
+    return true;
   }
   function selectPair(panel: string, clock: string) {
-    setSelectedPanel(panel);
-    setSelectedClock(clock);
     const row = displayed.find(
       (row) => panelKey(row) === panel && clockKey(row) === clock,
     );
-    select(row ? keyOf(row) : "", false);
+    if (select(row ? keyOf(row) : "", false)) {
+      setSelectedPanel(panel);
+      setSelectedClock(clock);
+    }
   }
   function rowsForSave(): SizePriceRow[] | null {
     if (!choice) return rows;
@@ -269,9 +289,6 @@ export function SizePrices({
             </p>
           )}
           <div className={styles.actions}>
-            <button type="submit" className="admin-primary">
-              <Save size={15} /> Fiyatı kaydet
-            </button>
             <button type="button" onClick={commit}>
               {editing ? <Pencil size={15} /> : <Plus size={15} />}
               {editing ? "Listeye uygula" : "Ekle"}
@@ -294,14 +311,18 @@ export function SizePrices({
           onToggle={(e) => setExpanded(e.currentTarget.open)}
         >
           <summary>
-            Eklenen ölçüler <span>{added.length}</span>
+            Kayıtlı ölçü fiyatları <span>{added.length}</span>
           </summary>
           <ul className={styles.rows}>
-            {added.map((row, i) => (
+            {added.map((row) => (
               <li className={styles.row} key={keyOf(row)}>
                 <div className={styles.size}>
                   {labelOf(row)}
-                  {product && i === 0 && <small>Varsayılan ölçü</small>}
+                  {product &&
+                    defaultRow &&
+                    keyOf(row) === keyOf(defaultRow) && (
+                      <small>Varsayılan ölçü</small>
+                    )}
                 </div>
                 <div className={styles.amount}>
                   {row.salePrice !== null && <del>{money(row.price)}</del>}

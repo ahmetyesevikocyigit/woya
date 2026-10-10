@@ -9,11 +9,6 @@ import {
   CircleCheck,
   Plus,
   Ruler,
-  FileText,
-  Settings,
-  Image,
-  Layers,
-  Bell,
 } from "lucide-react";
 import { protectPage } from "@/lib/admin/auth";
 import {
@@ -54,7 +49,7 @@ export default async function AdminPage({
   const [section = "", id] = path;
   const query = await searchParams;
   const saved = query.kaydedildi;
-  let title = "CMS Ana Sayfa";
+  let title = "Genel bakış";
   let content: React.ReactNode;
   if (path.length > 2) notFound();
   if (section === "urunler") {
@@ -146,7 +141,7 @@ export default async function AdminPage({
       />
     );
   } else if (section === "fiyatlandirma" && !id) {
-    title = "Ölçü ve Fiyatlandırma";
+    title = "Kişiselleştirme fiyatları";
     const record = await getPricingRecord();
     content = (
       <PricingForm
@@ -198,46 +193,18 @@ export default async function AdminPage({
           {[
             {
               href: "/admin/urunler",
-              label: "Ürünler ve fiyatlar",
+              label: "Ürün, görsel ve fiyat düzenle",
               icon: Package,
             },
-            { href: "/admin/urunler/yeni", label: "Ürün ekle", icon: Plus },
+            {
+              href: "/admin/urunler/yeni",
+              label: "Yeni ürün ekle",
+              icon: Plus,
+            },
             {
               href: "/admin/fiyatlandirma",
-              label: "Ölçü ve fiyatları düzenle",
+              label: "Kişiselleştirme fiyatlarını düzenle",
               icon: Ruler,
-            },
-            {
-              href: "/admin/icerik",
-              label: "Ana sayfa, iletişim ve site içeriği",
-              icon: FileText,
-            },
-            { href: "/admin/medya", label: "Görsel kütüphanesi", icon: Image },
-            { href: "/admin/kategoriler", label: "Kategoriler", icon: Layers },
-            {
-              href: "/admin/magaza?bolum=kargo",
-              label: "Kargo ve teslimat",
-              icon: Settings,
-            },
-            {
-              href: "/admin/magaza?bolum=iade",
-              label: "İade adresi",
-              icon: Settings,
-            },
-            {
-              href: "/admin/magaza?bolum=firma",
-              label: "Firma bilgileri",
-              icon: FileText,
-            },
-            {
-              href: "/admin/magaza?bolum=yasal",
-              label: "Satış ve gizlilik metinleri",
-              icon: FileText,
-            },
-            {
-              href: "/admin/bildirimler",
-              label: "E-posta ve ödeme kontrolleri",
-              icon: Bell,
             },
             {
               href: "/admin/siparisler",
@@ -270,7 +237,11 @@ export default async function AdminPage({
       </header>
       {saved && (
         <p role="status" className="admin-success">
-          Değişiklik kaydedildi.
+          {["urunler", "fiyatlandirma", "icerik", "kategoriler"].includes(
+            section,
+          )
+            ? "Değişiklik kaydedildi ve siteye yansıdı."
+            : "Değişiklik kaydedildi."}
         </p>
       )}
       {content}

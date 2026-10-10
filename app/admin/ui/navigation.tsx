@@ -19,9 +19,9 @@ import {
   Bell,
 } from "lucide-react";
 const links = [
-  ["/admin", "CMS Ana Sayfa", ChartNoAxesCombined],
+  ["/admin", "Genel bakış", ChartNoAxesCombined],
   ["/admin/urunler", "Ürünler ve Fiyatlar", Package],
-  ["/admin/fiyatlandirma", "Ölçü ve Fiyatlandırma", Ruler],
+  ["/admin/fiyatlandirma", "Kişiselleştirme Fiyatları", Ruler],
   ["/admin/kategoriler", "Kategoriler", Layers],
   ["/admin/siparisler", "Siparişler", ClipboardList],
   ["/admin/musteri-islemleri", "Müşteri İşlemleri", ClipboardList],
@@ -46,7 +46,7 @@ export function AdminNavigation() {
   return (
     <>
       <div className="admin-mobile-bar">
-        <Link href="/admin">WOYA / CMS</Link>
+        <Link href="/admin">WOYA / Yönetim</Link>
         <button
           onClick={() => setOpen(!open)}
           aria-label={open ? "Menüyü kapat" : "Menüyü aç"}
@@ -67,7 +67,7 @@ export function AdminNavigation() {
           WOYA<span>İçerik ve mağaza yönetimi</span>
         </Link>
         <nav aria-label="Yönetim menüsü">
-          {links.map(([href, title, Icon]) => (
+          {links.slice(0, 6).map(([href, title, Icon]) => (
             <Link
               key={href}
               href={href}
@@ -86,6 +86,23 @@ export function AdminNavigation() {
               {title}
             </Link>
           ))}
+          <details
+            className="admin-nav-settings"
+            open={links.slice(6).some(([href]) => pathname.startsWith(href))}
+          >
+            <summary>Site ve mağaza ayarları</summary>
+            {links.slice(6).map(([href, title, Icon]) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+                aria-current={pathname.startsWith(href) ? "page" : undefined}
+              >
+                <Icon size={19} />
+                {title}
+              </Link>
+            ))}
+          </details>
         </nav>
         <div className="admin-account">
           <a href="/" target="_blank" rel="noreferrer">

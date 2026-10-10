@@ -1,5 +1,16 @@
 # WOYA Yönetim Paneli
 
+## Günlük kullanım — 10 Ekim 2026
+
+Canlı panel: https://woyatablo.com/admin
+
+- **Ürünler ve Fiyatlar**: Ürünü arayıp açın. **Ürün ve görseller** bölümünde ad, açıklama, kategori ve görseller; **Ölçü ve fiyatlar** bölümünde normal/indirimli ölçü fiyatları; **Kişiselleştirme** bölümünde oluşturucu parçaları yönetilir.
+- **Kişiselleştirme Fiyatları**: Set ve tekli saat tarifeleri ayrı bölümlerdedir. Özel ölçü m² tarifeleri ve ölçü seçenekleri ayrıca düzenlenir. Bunlar oluşturucu fiyatlarıdır; hazır ürünün kendi ölçü fiyatlarını değiştirmez.
+- Kaydet ve yayınla / Değişiklikleri kaydet düğmesi açık fiyat düzenlemelerini de kaydeder. Bölüm değiştirirken girilmiş değerler korunur. Ölçü seçimleri arasında değiştirilen geçerli fiyatlar listeye alınır; geçersiz fiyatlar hata gösterir.
+- Kayıtlı fiyatlar varsayılan olarak açık görünür. Seçeneklerden kaldırılmış eski ölçü satırları görünür ve korunur; fiyatı silmek ayrı bir işlemdir.
+- Site ve mağaza ayarları sol menüde açılır. Mevcut içerik, görsel, ödeme, kargo, güvenlik ve sipariş araçları korunmuştur.
+- Kod yayınları üretim verilerini sıfırlamaz. Veri değişikliği testleri yalnızca ayrı veritabanı ve yükleme klasörlerinde yapılır. Eski sürümden kaydetme girişimleri sürüm denetimiyle reddedilir.
+
 ## Durum ve sınırlar
 
 PayTR iFrame ödeme akışı eklendi; varsayılan olarak kapalı ve test modundadır. Kurulum, gizli ortam değerleri, veritabanı migration'ı, bildirim adresi ve canlıya geçiş kontrolleri için [PAYTR.md](PAYTR.md) dosyasını okuyun. Bu kod değişikliği canlı ödeme aktivasyonu değildir. Entegrasyonlar ekranı ve eski sipariş talebi formu kapalı kalır; `/api/siparis-talebi` HTTP 410 döndürür. Sipariş geçmişi korunur.

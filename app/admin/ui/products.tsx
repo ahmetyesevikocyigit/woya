@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Pencil, Trash2, Search, Crop } from "lucide-react";
 import {
   productSaveSchema,
@@ -100,7 +100,7 @@ export function ProductsTable({
           Ürün ekle
         </Link>
       </div>
-      <div className="admin-table-wrap">
+      <div className="admin-table-wrap admin-products-table">
         <table>
           <thead>
             <tr>
@@ -218,6 +218,7 @@ export function ProductForm({
     clockRate: null,
   };
   function setMeasurementPricing(next: typeof measurementPricing) {
+    setDirty(true);
     setValue((v) => ({
       ...v,
       measurementPricing: next,
@@ -229,21 +230,36 @@ export function ProductForm({
         : {}),
     }));
   }
+  const [tab, setTab] = useState("bilgiler");
   const [cropping, setCropping] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   const sizePricesRef = useRef<SizePricesHandle>(null);
   const { busy, error, save } = useSave();
   const [validationError, setValidationError] = useState("");
   function field<K extends keyof ProductInput>(name: K, next: ProductInput[K]) {
+    setDirty(true);
     setValue((v) => ({ ...v, [name]: next }));
   }
   return (
     <form
-      className="admin-form"
+      className="admin-form admin-product-form"
+      noValidate
+      onChange={() => setDirty(true)}
       onSubmit={(e) => {
         e.preventDefault();
         if (cropping || busy) return;
         const rows = kind ? sizePricesRef.current?.rowsForSave() : undefined;
         if (rows === null) {
+          setTab("fiyatlar");
           setValidationError("Ölçü fiyatını kontrol edin.");
           return;
         }
@@ -264,18 +280,22 @@ export function ProductForm({
             : value,
         );
         if (!parsed.success) {
+          const path = parsed.error.issues[0]?.path[0];
+          setTab(
+            path === "measurementPricing" ||
+              path === "price" ||
+              path === "salePrice"
+              ? "fiyatlar"
+              : path === "builderParts"
+                ? "kisisellestirme"
+                : "bilgiler",
+          );
           setValidationError(
             parsed.error.issues.map((issue) => issue.message).join("\n"),
           );
           return;
         }
         setValidationError("");
-        if (
-          !window.confirm(
-            "Değişiklikleri kaydetmek istediğinize emin misiniz? Ürün kaydedildiğinde doğrudan yayınlanacak.",
-          )
-        )
-          return;
         void save(
           "products",
           { id: product?.id, version: product?.version, data: parsed.data },
@@ -283,90 +303,211 @@ export function ProductForm({
         );
       }}
     >
-      <div className="admin-editor-grid">
+      <div className="admin-edit-heading">
         <div>
-          <h2>Ürün Bilgileri</h2>
-          <label>
-            Ürün adı
-            <input
-              required
-              minLength={3}
-              maxLength={180}
-              value={value.title}
-              onChange={(e) => {
-                const title = e.target.value;
-                setValue((v) => ({
-                  ...v,
-                  title,
-                  slug:
-                    !product && v.slug === slugify(v.title)
-                      ? slugify(title)
-                      : v.slug,
-                }));
-              }}
-            />
-          </label>
-          <label>
-            Bağlantı adı (slug)
-            <input
-              required
-              pattern="[a-z0-9]+(-[a-z0-9]+)*"
-              maxLength={160}
-              value={value.slug}
-              onChange={(e) => field("slug", e.target.value)}
-            />
-          </label>
-          <label>
-            Açıklama
-            <textarea
-              required
-              minLength={10}
-              maxLength={10000}
-              rows={7}
-              value={value.description}
-              onChange={(e) => field("description", e.target.value)}
-            />
-          </label>
-          <div className="admin-two">
+          <h2>{value.title || "Yeni ürün"}</h2>
+          <p className="admin-muted">
+            Kaydettiğiniz değişiklikler doğrudan siteye yansır.
+          </p>
+        </div>
+        <div className="admin-edit-actions">
+          <button
+            type="submit"
+            className="admin-primary"
+            disabled={busy || cropping}
+          >
+            {busy ? "Kaydediliyor…" : "Kaydet ve yayınla"}
+          </button>
+          {product && (
+            <a
+              className="admin-inline-link"
+              href={`/urunler/${product.slug}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Sitede görüntüle
+            </a>
+          )}
+        </div>
+      </div>
+      <div
+        className="admin-settings-tabs"
+        role="group"
+        aria-label="Ürün düzenleme bölümleri"
+      >
+        {[
+          ["bilgiler", "Ürün ve görseller"],
+          ["fiyatlar", "Ölçü ve fiyatlar"],
+          ["kisisellestirme", "Kişiselleştirme"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={tab === key}
+            aria-controls={`product-${key}`}
+            disabled={busy || cropping}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <fieldset className="admin-edit-fields" disabled={busy}>
+        <div
+          className="admin-editor-grid"
+          id="product-bilgiler"
+          hidden={tab !== "bilgiler"}
+        >
+          <div>
+            <h2>Ürün Bilgileri</h2>
             <label>
-              Kategori
-              <select
-                value={value.categoryId}
-                onChange={(e) => field("categoryId", e.target.value)}
-              >
-                {categories
-                  .filter((c) => c.active)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
-              Ürün tipi
-              <select
-                value={value.type}
-                disabled={cropping}
-                onChange={(e) =>
+              Ürün adı
+              <input
+                required
+                minLength={3}
+                maxLength={180}
+                value={value.title}
+                onChange={(e) => {
+                  const title = e.target.value;
                   setValue((v) => ({
                     ...v,
-                    type: e.target.value as ProductInput["type"],
-                    measurementPricing: undefined,
-                    builderParts: v.builderParts
-                      ? { ...v.builderParts, enabled: false }
-                      : undefined,
-                  }))
+                    title,
+                    slug:
+                      !product && v.slug === slugify(v.title)
+                        ? slugify(title)
+                        : v.slug,
+                  }));
+                }}
+              />
+            </label>
+            <details className="admin-advanced">
+              <summary>Ürün bağlantısı</summary>
+              <label>
+                Bağlantı adı
+                <input
+                  required
+                  pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                  maxLength={160}
+                  value={value.slug}
+                  onChange={(e) => field("slug", e.target.value)}
+                />
+              </label>
+            </details>
+            <label>
+              Açıklama
+              <textarea
+                aria-label="Açıklama"
+                required
+                minLength={10}
+                maxLength={10000}
+                rows={4}
+                value={value.description}
+                onChange={(e) => field("description", e.target.value)}
+              />
+            </label>
+            <div className="admin-two">
+              <label>
+                Kategori
+                <select
+                  value={value.categoryId}
+                  onChange={(e) => field("categoryId", e.target.value)}
+                >
+                  {categories
+                    .filter((c) => c.active)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.title}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Ürün tipi
+                <select
+                  value={value.type}
+                  disabled={cropping}
+                  onChange={(e) => {
+                    if (
+                      value.measurementPricing &&
+                      !window.confirm(
+                        "Ürün tipini değiştirmek mevcut ölçü fiyatlarını sıfırlar ve kişiselleştirme parçalarını kapatır. Devam edilsin mi?",
+                      )
+                    )
+                      return;
+                    setValue((v) => ({
+                      ...v,
+                      type: e.target.value as ProductInput["type"],
+                      measurementPricing: undefined,
+                      builderParts: v.builderParts
+                        ? { ...v.builderParts, enabled: false }
+                        : undefined,
+                    }));
+                  }}
+                >
+                  <option value="set">Tablo ve saat seti</option>
+                  <option value="saat">Saat</option>
+                  <option value="tablo">Tablo</option>
+                  <option value="rehber">Rehber</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Kargo
+              <select
+                value={value.shippingIncluded ? "included" : "excluded"}
+                onChange={(e) =>
+                  field("shippingIncluded", e.target.value === "included")
                 }
               >
-                <option value="set">Tablo ve saat seti</option>
-                <option value="saat">Saat</option>
-                <option value="tablo">Tablo</option>
-                <option value="rehber">Rehber</option>
+                <option value="excluded">Kargo hariç</option>
+                <option value="included">Kargo dahil</option>
               </select>
             </label>
+            <h2>Görünürlük</h2>
+
+            <label className="admin-check">
+              <input
+                type="checkbox"
+                checked={value.featured}
+                onChange={(e) => field("featured", e.target.checked)}
+              />
+              Ürün listelerinde öne çıkar
+            </label>
+            {product && (
+              <div className="admin-danger-zone">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Ürün kalıcı olarak silinsin mi? Geçmiş sipariş kayıtları korunur.",
+                      )
+                    )
+                      void save(
+                        "products",
+                        { id: product.id, version: product.version },
+                        "/admin/urunler",
+                        "DELETE",
+                      );
+                  }}
+                >
+                  <Trash2 size={16} />
+                  Ürünü sil
+                </button>
+              </div>
+            )}
           </div>
-          <h2>Ölçü ve Fiyat</h2>
+          <aside>
+            <h2>Ürün Görselleri</h2>
+            <ImageEditor
+              images={value.images}
+              onChange={(v) => field("images", v)}
+            />
+          </aside>
+        </div>
+        <section id="product-fiyatlar" hidden={tab !== "fiyatlar"}>
+          <h2>Ölçü fiyatları</h2>
           {value.type !== "tablo" && value.type !== "rehber" && (
             <label>
               Saat şekli
@@ -377,13 +518,20 @@ export function ProductForm({
                     ? "circle"
                     : "rectangle")
                 }
-                onChange={(e) =>
+                onChange={(e) => {
+                  if (
+                    value.measurementPricing &&
+                    !window.confirm(
+                      "Saat şeklini değiştirmek mevcut ölçü fiyatlarını sıfırlar. Devam edilsin mi?",
+                    )
+                  )
+                    return;
                   setValue((v) => ({
                     ...v,
                     clockShape: e.target.value as "circle" | "rectangle",
                     measurementPricing: undefined,
-                  }))
-                }
+                  }));
+                }}
               >
                 <option value="rectangle">Kare / dikdörtgen</option>
                 <option value="circle">Yuvarlak</option>
@@ -392,7 +540,6 @@ export function ProductForm({
           )}
           {kind && (
             <>
-              <h2>Ölçülere göre fiyatlar</h2>
               <SizePrices
                 key={kind + ":" + shape}
                 ref={sizePricesRef}
@@ -405,182 +552,144 @@ export function ProductForm({
                   setMeasurementPricing({ ...measurementPricing, rows })
                 }
               />
-              <h2>Özel ölçü tarifesi</h2>
-              <div className="admin-two">
-                {(
-                  [
-                    ["panelRate", "Tablo · 1 m² (₺)"],
-                    ["clockRate", "Saat · 1 m² (₺)"],
-                  ] as const
-                )
-                  .filter(
-                    ([key]) =>
-                      kind === "set" ||
-                      (kind === "tablo"
-                        ? key === "panelRate"
-                        : key === "clockRate"),
+              <details className="admin-advanced">
+                <summary>Özel ölçü tarifesi</summary>
+                <div className="admin-two">
+                  {(
+                    [
+                      ["panelRate", "Tablo · 1 m² (₺)"],
+                      ["clockRate", "Saat · 1 m² (₺)"],
+                    ] as const
                   )
-                  .map(([key, label]) => (
-                    <label key={key}>
-                      {label}
-                      <input
-                        type="number"
-                        min="0.01"
-                        max="10000000"
-                        step="0.01"
-                        placeholder="Tanımlanmadı"
-                        value={measurementPricing[key] ?? ""}
-                        onChange={(e) =>
-                          setMeasurementPricing({
-                            ...measurementPricing,
-                            [key]:
-                              e.target.value === ""
-                                ? null
-                                : Number(e.target.value),
-                          })
-                        }
-                      />
-                    </label>
-                  ))}
-              </div>
-              <p>Gerekli tarifeler girildiğinde özel ölçü siparişe açılır.</p>
-            </>
-          )}
-          <label>
-            Kargo
-            <select
-              value={value.shippingIncluded ? "included" : "excluded"}
-              onChange={(e) =>
-                field("shippingIncluded", e.target.value === "included")
-              }
-            >
-              <option value="excluded">Kargo hariç</option>
-              <option value="included">Kargo dahil</option>
-            </select>
-          </label>
-          <h2>Görünürlük</h2>
-          <p>Kaydettiğiniz ürün doğrudan yayınlanır.</p>
-          <label className="admin-check">
-            <input
-              type="checkbox"
-              checked={value.featured}
-              onChange={(e) => field("featured", e.target.checked)}
-            />
-            Ürün listelerinde öne çıkar
-          </label>
-          {product && (
-            <div className="admin-danger-zone">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Ürün kalıcı olarak silinsin mi? Geçmiş sipariş kayıtları korunur.",
+                    .filter(
+                      ([key]) =>
+                        kind === "set" ||
+                        (kind === "tablo"
+                          ? key === "panelRate"
+                          : key === "clockRate"),
                     )
-                  )
-                    void save(
-                      "products",
-                      { id: product.id, version: product.version },
-                      "/admin/urunler",
-                      "DELETE",
-                    );
-                }}
-              >
-                <Trash2 size={16} />
-                Ürünü sil
-              </button>
-            </div>
-          )}
-        </div>
-        <aside>
-          <h2>Ürün Görselleri</h2>
-          <ImageEditor
-            images={value.images}
-            onChange={(v) => field("images", v)}
-          />
-        </aside>
-      </div>
-      {(value.type === "set" || value.type === "saat") && (
-        <section>
-          {!cropping && (
-            <>
-              <h2>Kendin Oluştur Parçaları</h2>
-              {value.builderParts && (
-                <>
-                  <label className="admin-check">
-                    <input
-                      type="checkbox"
-                      checked={value.builderParts.enabled}
-                      onChange={(e) =>
-                        field("builderParts", {
-                          ...value.builderParts!,
-                          enabled: e.target.checked,
-                        })
-                      }
-                    />
-                    Kendin Oluştur’da göster
-                  </label>
-                  <div className="admin-image-strip">
-                    {(["left", "center", "right"] as const).map(
-                      (part) =>
-                        value.builderParts?.[part] && (
-                          <Image
-                            key={part}
-                            src={value.builderParts[part]!}
-                            alt={
-                              part === "left"
-                                ? "Sol tablo"
-                                : part === "right"
-                                  ? "Sağ tablo"
-                                  : "Saat"
-                            }
-                            width={80}
-                            height={100}
-                            sizes="80px"
-                            style={{ objectFit: "contain" }}
-                          />
-                        ),
-                    )}
-                  </div>
-                </>
-              )}
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setCropping(true)}
-              >
-                <Crop size={17} />
-                {value.builderParts
-                  ? "Parçaları düzenle"
-                  : "Fotoğraftan parçaları hazırla"}
-              </button>
+                    .map(([key, label]) => (
+                      <label key={key}>
+                        {label}
+                        <input
+                          type="number"
+                          min="0.01"
+                          max="10000000"
+                          step="0.01"
+                          placeholder="Tanımlanmadı"
+                          value={measurementPricing[key] ?? ""}
+                          onChange={(e) =>
+                            setMeasurementPricing({
+                              ...measurementPricing,
+                              [key]:
+                                e.target.value === ""
+                                  ? null
+                                  : Number(e.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                    ))}
+                </div>
+                <p className="admin-muted">
+                  Gerekli tarifeler girildiğinde özel ölçü siparişe açılır.
+                </p>
+              </details>
             </>
-          )}
-          {cropping && (
-            <PartCropEditor
-              initial={value.builderParts}
-              sourceImage={value.images[0]?.url}
-              set={value.type === "set"}
-              onCancel={() => setCropping(false)}
-              onApply={(parts) => {
-                setValue((v) => ({
-                  ...v,
-                  builderParts: parts,
-                  clockShape:
-                    parts.regions.center.mask === "ellipse"
-                      ? "circle"
-                      : "rectangle",
-                  images: v.images.length
-                    ? v.images
-                    : [{ url: parts.source, alt: v.title, x: 50, y: 50 }],
-                }));
-                setCropping(false);
-              }}
-            />
           )}
         </section>
-      )}
+        <section
+          id="product-kisisellestirme"
+          hidden={tab !== "kisisellestirme"}
+        >
+          {(value.type === "set" ||
+            value.type === "saat" ||
+            value.type === "tablo") && (
+            <section>
+              {!cropping && (
+                <>
+                  <h2>Kişiselleştirme parçaları</h2>
+                  {value.builderParts && (
+                    <>
+                      <label className="admin-check">
+                        <input
+                          type="checkbox"
+                          checked={value.builderParts.enabled}
+                          onChange={(e) =>
+                            field("builderParts", {
+                              ...value.builderParts!,
+                              enabled: e.target.checked,
+                            })
+                          }
+                        />
+                        Kendin Oluştur’da göster
+                      </label>
+                      <div className="admin-image-strip">
+                        {(["left", "center", "right"] as const).map(
+                          (part) =>
+                            value.builderParts?.[part] && (
+                              <Image
+                                key={part}
+                                src={value.builderParts[part]!}
+                                alt={
+                                  part === "left"
+                                    ? "Sol tablo"
+                                    : part === "right"
+                                      ? "Sağ tablo"
+                                      : "Saat"
+                                }
+                                width={80}
+                                height={100}
+                                sizes="80px"
+                                style={{ objectFit: "contain" }}
+                              />
+                            ),
+                        )}
+                      </div>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setCropping(true)}
+                  >
+                    <Crop size={17} />
+                    {value.builderParts
+                      ? "Parçaları düzenle"
+                      : "Fotoğraftan parçaları hazırla"}
+                  </button>
+                </>
+              )}
+              {cropping && (
+                <PartCropEditor
+                  initial={value.builderParts}
+                  sourceImage={value.images[0]?.url}
+                  set={value.type === "set" || value.type === "tablo"}
+                  onCancel={() => setCropping(false)}
+                  onApply={(parts) => {
+                    setDirty(true);
+                    setValue((v) => ({
+                      ...v,
+                      builderParts: parts,
+                      clockShape:
+                        parts.regions.center.mask === "ellipse"
+                          ? "circle"
+                          : "rectangle",
+                      images: v.images.length
+                        ? v.images
+                        : [{ url: parts.source, alt: v.title, x: 50, y: 50 }],
+                    }));
+                    setCropping(false);
+                  }}
+                />
+              )}
+            </section>
+          )}
+          {value.type === "rehber" && (
+            <p>Bu ürün türünde kişiselleştirme parçası kullanılmaz.</p>
+          )}
+        </section>
+      </fieldset>
       <FormEnd
         busy={busy}
         disabled={cropping}

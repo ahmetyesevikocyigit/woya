@@ -63,6 +63,7 @@ export async function verifyAdminCms({
         : route.fulfill({ status: 200, body: "" }),
     );
     const page = await context.newPage();
+    page.on("dialog", (dialog) => dialog.accept());
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(base + "/admin/urunler/yeni");
@@ -79,6 +80,9 @@ export async function verifyAdminCms({
     await expect(
       main.getByRole("combobox", { name: "Kargo", exact: true }),
     ).toHaveValue("excluded");
+    await main
+      .getByRole("button", { name: "Ölçü ve fiyatlar", exact: true })
+      .click();
     const sizes = main.getByRole("region", {
       name: "Ölçülere göre fiyatlar",
       exact: true,
@@ -169,9 +173,55 @@ export async function verifyAdminCms({
     expect(productResponse.status()).toBe(200);
     const productId = (await productResponse.json()).id;
     await page.goto(base + "/admin/urunler/" + productId);
+    await expect(page).toHaveURL(base + "/admin/urunler/" + productId);
+    await main
+      .getByRole("button", { name: "Ürün ve görseller", exact: true })
+      .click();
+    await main
+      .getByLabel("Açıklama", { exact: true })
+      .fill("Panelden güncellenen gerçek ürün açıklaması.");
+    await main
+      .getByRole("button", { name: "Görseli değiştir", exact: true })
+      .click();
+    const mediaDialog = page.locator("dialog[open]");
+    const uploadResponse = page.waitForResponse(
+      (r) =>
+        r.url().endsWith("/api/admin/media") && r.request().method() === "POST",
+    );
+    await mediaDialog
+      .locator('input[type="file"]')
+      .setInputFiles("public/images/products/woya/woya-01.webp");
+    expect((await uploadResponse).status()).toBe(200);
+    await expect(mediaDialog).not.toBeVisible();
+    await main
+      .getByLabel("Alternatif metin", { exact: true })
+      .fill("CMS güncellenen görsel");
+    await expect
+      .poll(() =>
+        main
+          .locator(".admin-image-preview img")
+          .evaluate((img: HTMLImageElement) => img.naturalWidth),
+      )
+      .toBeGreaterThan(0);
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.screenshot({
+        path: `work/cms-qa/product-info-${width}.png`,
+        fullPage: true,
+      });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+      ).toBe(true);
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await main
       .getByRole("combobox", { name: "Kargo", exact: true })
       .selectOption("included");
+    await main
+      .getByRole("button", { name: "Ölçü ve fiyatlar", exact: true })
+      .click();
     await expect(sizes.getByRole("spinbutton")).toHaveCount(0);
     await setSizePrice(sizes, "Tablo 50 × 70 cm · Saat 60 × 60 cm", "750");
     await setSizePrice(
@@ -185,6 +235,10 @@ export async function verifyAdminCms({
         name: "Tablo 50 × 70 cm · Saat 70 × 70 cm kaldır",
         exact: true,
       })
+      .click();
+    await main
+      .locator("summary")
+      .filter({ hasText: "Özel ölçü tarifesi" })
       .click();
     await main.getByLabel("Tablo · 1 m² (₺)", { exact: true }).fill("10000");
     await main.getByLabel("Saat · 1 m² (₺)", { exact: true }).fill("5000");
@@ -205,19 +259,6 @@ export async function verifyAdminCms({
     await expect(sizes.getByRole("alert")).toContainText("düşük olmalı");
     expect(productPosts).toBe(0);
     await sizes.getByLabel("İndirimli fiyat (₺)", { exact: true }).fill("799");
-    page.once("dialog", async (dialog) => {
-      expect(dialog.message()).toContain("emin misiniz");
-      await dialog.dismiss();
-    });
-    await main
-      .getByRole("button", { name: "Değişiklikleri kaydet", exact: true })
-      .click();
-    expect(productPosts).toBe(0);
-    await expect(page).toHaveURL(base + "/admin/urunler/" + productId);
-    page.once("dialog", async (dialog) => {
-      expect(dialog.message()).toContain("doğrudan yayınlanacak");
-      await dialog.accept();
-    });
     await main
       .getByRole("button", { name: "Değişiklikleri kaydet", exact: true })
       .click();
@@ -227,6 +268,9 @@ export async function verifyAdminCms({
     await expect(
       main.getByRole("combobox", { name: "Kargo", exact: true }),
     ).toHaveValue("included");
+    await main
+      .getByRole("button", { name: "Ölçü ve fiyatlar", exact: true })
+      .click();
     await expect(sizes.getByRole("spinbutton")).toHaveCount(0);
     await pickSize(sizes, "Tablo 50 × 70 cm · Saat 50 × 50 cm");
     await expect(sizes.getByLabel("Fiyat (₺)", { exact: true })).toHaveValue(
@@ -249,8 +293,9 @@ export async function verifyAdminCms({
       sizes.getByRole("button", { name: "Ekle", exact: true }),
     ).toBeVisible();
     await sizes.getByRole("button", { name: "Vazgeç", exact: true }).click();
-    await expect(sizes.locator("details")).not.toHaveAttribute("open", "");
+    await expect(sizes.locator("details")).toHaveAttribute("open", "");
 
+    await sizes.locator("summary").click();
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1000 });
       await page.screenshot({
@@ -272,6 +317,16 @@ export async function verifyAdminCms({
       await sizes.locator("summary").click();
     }
     await page.goto(base + "/urunler/cms-kargo-urunu");
+    await expect(
+      main.getByText("Panelden güncellenen gerçek ürün açıklaması.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      main
+        .getByRole("img", { name: "CMS güncellenen görsel", exact: true })
+        .first(),
+    ).toBeVisible();
     await expect(main.getByText("Kargo dahil", { exact: true })).toBeVisible();
     await expect(
       main.getByRole("button", {
@@ -423,6 +478,7 @@ export async function verifyBuilderSizePrices({
         : route.fulfill({ status: 200, body: "" }),
     );
     const page = await context.newPage();
+    page.on("dialog", (dialog) => dialog.accept());
     await page.goto(base + "/admin/fiyatlandirma");
     const set = page.getByRole("region", {
       name: "Set ölçü fiyatları",
@@ -437,20 +493,28 @@ export async function verifyBuilderSizePrices({
     await setSizePrice(set, "Tablo 50 × 70 cm · Saat 60 × 60 cm", "7700");
     await pickSize(set, "Tablo 50 × 70 cm · Saat 60 cm çap");
     await set.getByLabel("Fiyat (₺)", { exact: true }).fill("7800");
+    await page
+      .getByRole("button", { name: "Tekli saat fiyatları", exact: true })
+      .click();
     await setSizePrice(clock, "Saat 60 × 60 cm", "9900");
     await pickSize(clock, "Saat 60 cm çap");
     await clock.getByLabel("Fiyat (₺)", { exact: true }).fill("9800");
-    page.once("dialog", (d) => d.accept());
     await page
       .getByRole("button", { name: "Değişiklikleri kaydet", exact: true })
       .click();
     await expect(page).toHaveURL(/kaydedildi=1/);
     await page.reload();
+    await page
+      .getByRole("button", { name: "Tekli saat fiyatları", exact: true })
+      .click();
     await pickSize(clock, "Saat 60 cm çap");
     await expect(clock.getByLabel("Fiyat (₺)", { exact: true })).toHaveValue(
       "9800",
     );
     await clock.getByRole("button", { name: "Vazgeç", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Set fiyatları", exact: true })
+      .click();
     await pickSize(set, "Tablo 50 × 70 cm · Saat 60 cm çap");
     await expect(set.getByLabel("Fiyat (₺)", { exact: true })).toHaveValue(
       "7800",
@@ -458,16 +522,18 @@ export async function verifyBuilderSizePrices({
     await set.getByRole("button", { name: "Vazgeç", exact: true }).click();
     // A second save on the same page must use the refreshed version and publish
     // the open editor without requiring the intermediate list action.
+    await page
+      .getByRole("button", { name: "Tekli saat fiyatları", exact: true })
+      .click();
     await pickSize(clock, "Saat 60 × 60 cm");
     await clock.getByLabel("Fiyat (₺)", { exact: true }).fill("9910");
-    page.once("dialog", (d) => d.accept());
     const quickSave = page.waitForResponse(
       (r) =>
         r.url().endsWith("/api/admin/pricing") &&
         r.request().method() === "POST",
     );
-    await clock
-      .getByRole("button", { name: "Fiyatı kaydet", exact: true })
+    await page
+      .getByRole("button", { name: "Değişiklikleri kaydet", exact: true })
       .click();
     expect((await quickSave).status()).toBe(200);
     await expect(clock.getByRole("spinbutton")).toHaveCount(0);
