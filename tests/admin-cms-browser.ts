@@ -564,3 +564,118 @@ export async function verifyBuilderSizePrices({
     await browser.close();
   }
 }
+
+export async function verifyCategoryOrganization({
+  base,
+  cookie,
+}: {
+  base: string;
+  cookie: string;
+}) {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 1000 },
+    });
+    const split = cookie.indexOf("=");
+    await context.addCookies([
+      {
+        name: cookie.slice(0, split),
+        value: cookie.slice(split + 1),
+        url: base,
+      },
+    ]);
+    await context.route("**/*", (route) =>
+      new URL(route.request().url()).origin === base
+        ? route.continue()
+        : route.fulfill({ status: 200, body: "" }),
+    );
+    const page = await context.newPage();
+    await page.goto(base + "/admin/urunler?kategori=uclu-setler");
+    const tabs = page.getByRole("navigation", { name: "Ürün kategorileri" });
+    await expect(
+      tabs.getByRole("link", { name: /Üçlü Setler/ }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      page.getByRole("combobox", { name: "Kategori filtresi" }),
+    ).toHaveValue("uclu-setler");
+    expect(
+      await page.locator(".admin-products-table tbody tr").count(),
+    ).toBeGreaterThan(0);
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: `work/cms-qa/category-admin-${width}.png`,
+        fullPage: true,
+      });
+    }
+    await page.getByRole("link", { name: "Ürün ekle", exact: true }).click();
+    await expect(
+      page.getByRole("combobox", { name: "Kategori", exact: true }),
+    ).toHaveValue("uclu-setler");
+    await page.goto(base + "/admin/urunler/yeni?kategori=dekoratif-saatler");
+    await expect(
+      page.getByRole("combobox", { name: "Ürün tipi", exact: true }),
+    ).toHaveValue("saat");
+    await page.goto(base + "/#kategoriler");
+    const categories = page.getByRole("region", {
+      name: "Kategoriler",
+      exact: true,
+    });
+    await expect(
+      categories.getByRole("link", { name: /Üçlü Setler/ }),
+    ).toBeVisible();
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await categories.scrollIntoViewIfNeeded();
+      await expect
+        .poll(() =>
+          page
+            .locator(".home-category-image img")
+            .evaluateAll((images) =>
+              images.every(
+                (img) =>
+                  (img as HTMLImageElement).complete &&
+                  (img as HTMLImageElement).naturalWidth > 0,
+              ),
+            ),
+        )
+        .toBe(true);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth + 1,
+        ),
+      ).toBe(true);
+      await categories.screenshot({
+        path: `work/cms-qa/category-home-${width}.png`,
+      });
+    }
+    await categories.getByRole("link", { name: /Üçlü Setler/ }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      "Üçlü Setler",
+    );
+    await expect(
+      page
+        .getByRole("navigation", { name: "Katalog sayfaları" })
+        .getByRole("link", { name: "Üçlü Setler", exact: true }),
+    ).toHaveAttribute("data-active", "true");
+    await page.goto(base + "/saatler");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Saatler");
+    await expect(
+      page.locator(".catalog-results .product-gallery-grid"),
+    ).toHaveCount(1);
+    await expect(
+      page.locator(".catalog-results .product-gallery-grid"),
+    ).not.toContainText("Gümüş Aplikli Saat Seti");
+    console.log(
+      "PASS Category organization: admin filters, category-aware creation, home counts/cards, category links, clock set separation, desktop and mobile",
+    );
+  } finally {
+    await browser.close();
+  }
+}

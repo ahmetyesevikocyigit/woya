@@ -1210,3 +1210,27 @@
     white-space: nowrap;
   }
 }
+.root :global(.admin-category-tabs) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0;
+}
+.root :global(.admin-category-tabs a) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d9dce0;
+  padding: 10px 14px;
+  background: white;
+  border-radius: 6px;
+}
+.root :global(.admin-category-tabs a[aria-current="page"]) {
+  background: #17191c;
+  color: white;
+  border-color: #17191c;
+}
+.root :global(.admin-category-tabs span) {
+  font-size: 12px;
+  opacity: 0.7;
+}

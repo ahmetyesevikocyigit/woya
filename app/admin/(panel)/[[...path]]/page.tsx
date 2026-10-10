@@ -37,6 +37,7 @@ export default async function AdminPage({
 }: {
   params: Promise<{ path?: string[] }>;
   searchParams: Promise<{
+    kategori?: string;
     kaydedildi?: string;
     bolum?: string;
     q?: string;
@@ -64,8 +65,9 @@ export default async function AdminPage({
       title = product ? "Ürünü Düzenle" : "Yeni Ürün";
       content = (
         <ProductForm
-          key={`${id}-${product?.version}`}
+          key={`${id}-${product?.version}-${query.kategori ?? ""}`}
           product={product}
+          initialCategory={query.kategori}
           categories={categories}
           pricing={pricingRecord.data}
         />
@@ -78,6 +80,8 @@ export default async function AdminPage({
       title = "Ürünler";
       content = (
         <ProductsTable
+          key={query.kategori ?? "all"}
+          initialCategory={query.kategori}
           products={products.map((p) => ({
             id: p.id,
             code: p.code,

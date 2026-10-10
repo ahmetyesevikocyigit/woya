@@ -4,6 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import { CustomBuilder } from "./components/custom-builder";
 import { FaqSection } from "./components/faq-section";
 import { HeroSlideshow, type HeroSlide } from "./components/hero-slideshow";
+import { CategoryCards } from "./components/category-cards";
 import { ProductGrid } from "./components/product-card";
 import {
   SiteFooter,
@@ -16,6 +17,7 @@ import {
 } from "./components/site-chrome";
 import {
   getContent,
+  getCategories,
   getStorefrontPricing as getPricing,
 } from "@/lib/admin/repository";
 import { storefrontProducts } from "@/lib/storefront";
@@ -58,9 +60,10 @@ const jsonLd = {
 };
 
 export default async function Home() {
-  const [content, woyaProducts] = await Promise.all([
+  const [content, woyaProducts, categories] = await Promise.all([
     getContent(),
     storefrontProducts(),
+    getCategories(),
   ]);
   const featuredProducts = content.favorites;
   const heroSlides: HeroSlide[] = content.heroImages.map((im, i) => ({
@@ -108,6 +111,8 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      <CategoryCards categories={categories} products={woyaProducts} />
 
       <section
         className="favorites-section"

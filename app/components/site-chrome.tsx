@@ -121,7 +121,7 @@ export async function SiteHeader() {
       </Link>
 
       <nav className="nav-links nav-links-left" aria-label="Sol navigasyon">
-        <Link href="/koleksiyon">KOLEKSİYON</Link>
+        <Link href="/uclu-setler">ÜÇLÜ SETLER</Link>
         <Link href="/saatler">SAATLER</Link>
         <Link href="/tablolar">TABLOLAR</Link>
       </nav>

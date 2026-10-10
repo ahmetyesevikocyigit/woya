@@ -28,6 +28,7 @@ jobs:
       - run: pnpm typecheck
       - run: |
           pnpm test:admin
+          pnpm test:categories
           pnpm test:pricing
           pnpm test:artwork
           pnpm test:crop

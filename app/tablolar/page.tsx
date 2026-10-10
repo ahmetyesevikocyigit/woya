@@ -6,7 +6,7 @@ import { storefrontProducts } from "@/lib/storefront";
 export const metadata: Metadata = {
   title: "Tablolar",
   description:
-    "WOYA tablo ve tablo-saat setlerini modern, çiçekli, botanik ve aynalı seçeneklerle keşfedin.",
+    "WOYA saatsiz tablo modellerini modern, çiçekli, botanik ve aynalı seçeneklerle keşfedin.",
   alternates: { canonical: "/tablolar" },
 };
 
@@ -14,8 +14,8 @@ export default async function TablesPage() {
   const tableProducts = await storefrontProducts("tablolar");
   return (
     <PageShell
-      title="Tablo ve Setler"
-      text="Yan paneller, saat merkezi ve duvar oranı birlikte değerlendirilerek dengeli bir görünüm hazırlanır."
+      title="Tablolar"
+      text="Saat içermeyen dekoratif tabloları ve tablo kompozisyonlarını keşfedin."
     >
       <CatalogPageContent
         products={tableProducts}

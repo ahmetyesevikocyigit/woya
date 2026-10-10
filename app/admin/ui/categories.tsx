@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { categoryHref } from "@/lib/catalog-categories";
 import { useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import type { Category, ProductRecord } from "@/lib/admin/schema";
@@ -55,7 +57,14 @@ export function Categories({
                   <strong>{c.title}</strong>
                   <small>{c.id}</small>
                 </td>
-                <td>{products.filter((p) => p.categoryId === c.id).length}</td>
+                <td>
+                  <Link
+                    href={`/admin/urunler?kategori=${encodeURIComponent(c.id)}`}
+                  >
+                    {products.filter((p) => p.categoryId === c.id).length} ürün
+                    · Görüntüle
+                  </Link>
+                </td>
                 <td>{c.surfaces.join(", ") || "Tüm ürünler"}</td>
                 <td>{c.active ? "Aktif" : "Pasif"}</td>
                 <td>{c.position}</td>
@@ -115,6 +124,15 @@ function CategoryForm({
       }}
     >
       <h2>{creating ? "Yeni Kategori" : initial.title}</h2>
+      <p className="admin-muted">
+        Aktif ve ürün içeren kategoriler ana sayfada otomatik görünür. Adı ve
+        sırası kaydedildiğinde siteye yansır.
+      </p>
+      {!creating && initial.active && (
+        <a href={categoryHref(initial.id)} target="_blank" rel="noreferrer">
+          Sitede kategoriyi görüntüle
+        </a>
+      )}
       <div className="admin-two">
         <label>
           Kategori adı

@@ -22,6 +22,7 @@ const PartCropEditor = dynamic(() => import("./part-crop-editor"), {
 export function ProductsTable({
   products,
   categories,
+  initialCategory,
 }: {
   products: Pick<
     ProductRecord,
@@ -38,9 +39,12 @@ export function ProductsTable({
     | "images"
   >[];
   categories: Category[];
+  initialCategory?: string;
 }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(
+    categories.some((c) => c.id === initialCategory) ? initialCategory! : "",
+  );
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [page, setPage] = useState(1);
   const filtered = products.filter(
@@ -55,6 +59,30 @@ export function ProductsTable({
   const current = Math.min(page, pages);
   return (
     <>
+      <nav className="admin-category-tabs" aria-label="Ürün kategorileri">
+        <Link
+          href="/admin/urunler"
+          aria-current={!category ? "page" : undefined}
+        >
+          Tüm ürünler <span>{products.length}</span>
+        </Link>
+        {categories
+          .filter(
+            (c) => c.active || products.some((p) => p.categoryId === c.id),
+          )
+          .map((c) => (
+            <Link
+              key={c.id}
+              href={`/admin/urunler?kategori=${encodeURIComponent(c.id)}`}
+              aria-current={category === c.id ? "page" : undefined}
+            >
+              {c.title}{" "}
+              <span>
+                {products.filter((p) => p.categoryId === c.id).length}
+              </span>
+            </Link>
+          ))}
+      </nav>
       <div className="admin-toolbar">
         <label className="admin-search">
           <Search size={17} />
@@ -95,7 +123,14 @@ export function ProductsTable({
           <option value="">Tüm ürünler</option>
           <option value="featured">Öne çıkan</option>
         </select>
-        <Link className="admin-primary" href="/admin/urunler/yeni">
+        <Link
+          className="admin-primary"
+          href={
+            category
+              ? `/admin/urunler/yeni?kategori=${encodeURIComponent(category)}`
+              : "/admin/urunler/yeni"
+          }
+        >
           <Plus size={17} />
           Ürün ekle
         </Link>
@@ -202,12 +237,31 @@ export function ProductForm({
   product,
   categories,
   pricing,
+  initialCategory,
 }: {
   product?: ProductRecord;
   categories: Category[];
   pricing: PricingSettings;
+  initialCategory?: string;
 }) {
-  const [value, setValue] = useState<ProductInput>(product ?? newProduct);
+  const [value, setValue] = useState<ProductInput>(() => {
+    if (product) return product;
+    const categoryId =
+      categories.find((c) => c.active && c.id === initialCategory)?.id ??
+      categories.find((c) => c.active && c.id === "uclu-setler")?.id ??
+      categories.find((c) => c.active)?.id ??
+      newProduct.categoryId;
+    return {
+      ...newProduct,
+      categoryId,
+      type:
+        categoryId === "dekoratif-saatler"
+          ? "saat"
+          : categoryId === "tablolar"
+            ? "tablo"
+            : "set",
+    };
+  });
   const kind = value.type === "rehber" ? null : value.type;
   const shape = clockShapeFor(value);
   const measurementPricing = value.measurementPricing ?? {
@@ -413,7 +467,7 @@ export function ProductForm({
                   onChange={(e) => field("categoryId", e.target.value)}
                 >
                   {categories
-                    .filter((c) => c.active)
+                    .filter((c) => c.active || c.id === value.categoryId)
                     .map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.title}

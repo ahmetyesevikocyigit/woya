@@ -1,4 +1,6 @@
 import type { MetadataRoute } from "next";
+import { getCategories } from "@/lib/admin/repository";
+import { categoryGroups, categoryHref } from "@/lib/catalog-categories";
 import { storefrontProducts } from "@/lib/storefront";
 import { legalHref, legalPages, legalUpdatedAt } from "@/lib/legal";
 
@@ -31,6 +33,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.78,
     })),
+    ...categoryGroups(await getCategories(), woyaProducts).map(
+      ({ category }) => ({
+        url: `${siteUrl}${categoryHref(category.id)}`,
+        changeFrequency: "weekly" as const,
+        priority: 0.78,
+      }),
+    ),
     ...legalPages.map((page) => ({
       url: `${siteUrl}${legalHref(page.slug)}`,
       lastModified: new Date(legalUpdatedAt),

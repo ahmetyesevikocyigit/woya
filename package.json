@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "admin:setup": "tsx scripts/admin-setup.ts",
     "admin:password": "node scripts/admin-password.mjs",
+    "test:categories": "tsx tests/category-organization.ts",
     "test:admin": "tsx --test tests/admin.test.ts",
     "test:pricing": "tsx --test tests/pricing.test.ts",
     "test:artwork": "tsx --test tests/clock-artwork.test.ts",

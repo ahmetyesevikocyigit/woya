@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 const links = [
   ["Koleksiyon", "/koleksiyon"],
   ["Saatler", "/saatler"],
+  ["Üçlü Setler", "/uclu-setler"],
   ["Tablolar", "/tablolar"],
   ["Kendi Tasarımınız", "/#kendi-tasariminiz"],
   ["İletişim", "/iletisim"],
@@ -32,7 +33,11 @@ export function MobileMenu() {
       }
     }
     function onPointer(event: PointerEvent) {
-      if (event.target instanceof Node && ref.current && !ref.current.contains(event.target)) {
+      if (
+        event.target instanceof Node &&
+        ref.current &&
+        !ref.current.contains(event.target)
+      ) {
         ref.current.open = false;
       }
     }
@@ -45,15 +50,33 @@ export function MobileMenu() {
   }, [open]);
 
   return (
-    <details className="mobile-menu" ref={ref} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary className="mobile-nav-tab" aria-label={open ? "Menüyü kapat" : "Menüyü aç"}>
-        {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
+    <details
+      className="mobile-menu"
+      ref={ref}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary
+        className="mobile-nav-tab"
+        aria-label={open ? "Menüyü kapat" : "Menüyü aç"}
+      >
+        {open ? (
+          <X size={22} aria-hidden="true" />
+        ) : (
+          <Menu size={22} aria-hidden="true" />
+        )}
       </summary>
       <nav className="mobile-menu-panel" aria-label="Mobil navigasyon">
         {links.map(([label, href]) => (
-          <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined}
-            onClick={() => { if (ref.current) ref.current.open = false; }}>
-            {label}<ArrowUpRight size={18} aria-hidden="true" />
+          <Link
+            key={href}
+            href={href}
+            aria-current={pathname === href ? "page" : undefined}
+            onClick={() => {
+              if (ref.current) ref.current.open = false;
+            }}
+          >
+            {label}
+            <ArrowUpRight size={18} aria-hidden="true" />
           </Link>
         ))}
       </nav>

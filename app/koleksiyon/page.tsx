@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { CategoryCards } from "../components/category-cards";
+import { getCategories } from "@/lib/admin/repository";
 import { CatalogPageContent } from "../components/catalog-page-content";
 import { PageShell } from "../components/page-shell";
 import { storefrontProducts } from "@/lib/storefront";
@@ -12,24 +12,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/koleksiyon" },
 };
 
-const collectionCards = [
-  {
-    title: "Tablo ve Saat Setleri",
-    text: "Üç parçalı düzen, salon duvarında güçlü ama dengeli bir odak oluşturur.",
-    href: "/tablolar",
-  },
-  {
-    title: "Dekoratif Saatler",
-    text: "Romen, normal ve minimal kadran seçenekleriyle saat merkezli kompozisyonlar.",
-    href: "/saatler",
-  },
-  {
-    title: "Kendi Setinizi Kurun",
-    text: "Seçili WOYA parçalarını sol tablo, saat merkezi ve sağ tablo olarak birleştirin.",
-    href: "/#kendi-tasariminiz",
-  },
-];
-
 export default async function CollectionPage() {
   const sellableProducts = await storefrontProducts("koleksiyon");
   return (
@@ -37,22 +19,10 @@ export default async function CollectionPage() {
       title="WOYA Parçaları"
       text="Aynı dekor dili içinde farklı ton, desen ve saat merkezlerini bir araya getiren seçili ürün ailesi."
     >
-      <section
-        className="collection-story-section"
-        aria-label="Koleksiyon yönlendirmeleri"
-      >
-        {collectionCards.map((card) => (
-          <Link
-            className="collection-story-card"
-            href={card.href}
-            key={card.title}
-          >
-            <span>{card.title}</span>
-            <p>{card.text}</p>
-            <ArrowUpRight aria-hidden="true" size={17} />
-          </Link>
-        ))}
-      </section>
+      <CategoryCards
+        categories={await getCategories()}
+        products={sellableProducts}
+      />
       <CatalogPageContent
         products={sellableProducts}
         active="Koleksiyon"

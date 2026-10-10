@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { ProductGrid } from "./product-card";
+import { categoryHref } from "@/lib/catalog-categories";
 import type { WoyaProduct } from "../data/products";
 
 const catalogLinks = [
   { label: "Tüm Ürünler", href: "/urunler" },
   { label: "Koleksiyon", href: "/koleksiyon" },
   { label: "Saatler", href: "/saatler" },
+  { label: "Üçlü Setler", href: "/uclu-setler" },
   { label: "Tablolar", href: "/tablolar" },
 ];
 
@@ -19,12 +21,12 @@ export function CatalogPageContent({
   active: string;
   note: string;
 }) {
-  const collections = new Map<string, number>();
+  const collections = new Map<string, { label: string; count: number }>();
   products.forEach((product) => {
-    collections.set(
-      product.collectionLabel,
-      (collections.get(product.collectionLabel) ?? 0) + 1,
-    );
+    collections.set(product.collection, {
+      label: product.collectionLabel,
+      count: (collections.get(product.collection)?.count ?? 0) + 1,
+    });
   });
 
   return (
@@ -55,10 +57,10 @@ export function CatalogPageContent({
             <p>{products.length} ürün listeleniyor.</p>
           </div>
           <div className="catalog-tags" aria-label="Koleksiyon dağılımı">
-            {[...collections.entries()].map(([label, count]) => (
-              <span key={label}>
+            {[...collections.entries()].map(([id, { label, count }]) => (
+              <Link href={categoryHref(id)} key={id}>
                 {label} · {count}
-              </span>
+              </Link>
             ))}
           </div>
         </div>

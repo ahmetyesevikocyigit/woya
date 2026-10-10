@@ -1503,6 +1503,45 @@ async function main() {
       ) === ordersBeforeUpgrade,
       "Migration preserves order snapshots",
     );
+    const { organizeCategories } =
+      await import("../lib/admin/organize-categories");
+    await organizeCategories(pg, {
+      woya_products: (await pg.query("SELECT * FROM woya_products ORDER BY id"))
+        .rows,
+      woya_categories: (
+        await pg.query("SELECT * FROM woya_categories ORDER BY id")
+      ).rows,
+    });
+    check(
+      (await fetch(base + "/uclu-setler")).status === 200,
+      "Three-piece set category route loads",
+    );
+    const missingCategory = await fetch(base + "/kategori/not-a-category");
+    check(
+      (await missingCategory.text()).includes("Aradığınız sayfa bulunamadı."),
+      "Unknown category renders not-found page",
+    );
+    const categoryHome = await (await fetch(base)).text();
+    check(
+      categoryHome.includes('id="kategoriler"') &&
+        categoryHome.includes("Üçlü Setler"),
+      "Home categories read organized live catalog",
+    );
+    if (process.env.WOYA_ADMIN_BROWSER_TESTS === "1") {
+      const { verifyCategoryOrganization } =
+        await import("./admin-cms-browser");
+      await pg.query("DELETE FROM woya_rate_limits");
+      cookie = "";
+      const categoryLogin = await api("/api/admin/auth", {
+        password: nextPassword,
+      });
+      check(
+        categoryLogin.status === 200,
+        "Fresh session for category browser checks",
+      );
+      cookie = categoryLogin.headers.get("set-cookie")!.split(";")[0];
+      await verifyCategoryOrganization({ base, cookie });
+    }
     console.log(
       `${count} HTTP checks passed. Test database and uploads will be removed.`,
     );

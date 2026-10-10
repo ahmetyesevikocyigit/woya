@@ -167,3 +167,15 @@ Talep akışının ve Entegrasyonlar ekranının kaldırılmasından sonra üret
 - `app/{page.tsx,iletisim/page.tsx,sss/page.tsx,sepet/page.tsx,saatler/page.tsx,tablolar/page.tsx,urunler/page.tsx,urunler/[slug]/page.tsx,koleksiyon/page.tsx,sitemap.ts,robots.ts}`: kalıcı veriye bağlantı ve indeksleme.
 - `app/data/products.ts`, `app/components/{product-card.tsx,product-detail-gallery.tsx,site-chrome.tsx,site-search.tsx,faq-section.tsx,custom-builder.tsx,cart-provider.tsx,cart-page-client.tsx}`: mevcut mağazayla entegrasyon. Kullanılmayan inquiry-form bileşeni/stili ve admin entegrasyon bileşeni silindi.
 - `tests/admin.test.ts`, `tests/admin-http.ts`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `next.config.mjs`: doğrulama, bağımlılıklar ve güvenli medya/header ayarları.
+
+
+### Kategori düzeni — 10 Ekim 2026
+
+- **Saatler:** tekli duvar saatleri.
+- **Üçlü Setler:** saat ve iki yan parçadan oluşan tablo / aynalı setler.
+- **Tablolar:** saat içermeyen tablolar ve tablo kompozisyonları.
+- Ürünler ve Fiyatlar sayfasındaki kategori bağlantıları ürün sayısını gösterir. Kategoriyi seçip **Ürün ekle** dediğinizde kategori hazır gelir.
+- Ürünün kategorisini Ürün ve görseller bölümünden değiştirebilirsiniz. Kategori değişikliği mevcut ölçü fiyatlarını veya kişiselleştirme parçalarını sıfırlamaz.
+- Kategoriler sayfasındaki aktif, ürün içeren kategoriler ana sayfada otomatik görünür. Kategori adı, sırası ve görünürlüğü kaydedildiğinde siteye yansır.
+- Eski Tablo ve saat setleri / Aynalı setler kayıtları silinmeden pasife alındı. Önceden eklenen kanvas tablolar ve dresuvar kategorileri korunur; ürün eklendiğinde ana sayfada görünürler.
+- Kategori taşıması dağıtım sırasında otomatik çalışmaz; fiyat, görsel, açıklama, ürün tipi ve sipariş kayıtlarını değiştirmez.

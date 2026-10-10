@@ -6,7 +6,7 @@ import { storefrontProducts } from "@/lib/storefront";
 export const metadata: Metadata = {
   title: "Dekoratif Saatler",
   description:
-    "WOYA dekoratif saat modellerini, saat merkezli setleri ve kadran seçeneklerini inceleyin.",
+    "WOYA tekli dekoratif saat modellerini ve kadran seçeneklerini inceleyin.",
   alternates: { canonical: "/saatler" },
 };
 
@@ -14,13 +14,13 @@ export default async function ClocksPage() {
   const clockProducts = await storefrontProducts("saatler");
   return (
     <PageShell
-      title="Dekoratif Saatler"
-      text="Saat merkezli setlerde kadran dili, ton ve yan parça dengesi birlikte düşünülür."
+      title="Saatler"
+      text="Tekli duvar saatlerini ve kadran seçeneklerini keşfedin."
     >
       <CatalogPageContent
         products={clockProducts}
         active="Saatler"
-        note="Saat sayfalarında ana görselin yanında parça görünümü ve rakam stili detayları özellikle öne çıkarılır."
+        note="Saat ve iki yan parçadan oluşan modeller Üçlü Setler kategorisinde yer alır."
       />
     </PageShell>
   );
