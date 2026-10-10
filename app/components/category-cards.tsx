@@ -26,34 +26,38 @@ export function CategoryCards({
       </div>
       <div className="home-category-grid">
         {categoryGroups(categories, products).map(
-          ({ category, products: items }) => (
-            <Link
-              className="home-category-card"
-              href={categoryHref(category.id)}
-              key={category.id}
-            >
-              <div className="home-category-image">
-                <Image
-                  src={items[0].image}
-                  alt={category.title}
-                  fill
-                  sizes="(max-width: 680px) 90vw, 33vw"
-                  style={{
-                    objectPosition: items[0].images?.[0]
-                      ? `${items[0].images[0].x}% ${items[0].images[0].y}%`
-                      : undefined,
-                  }}
-                />
-              </div>
-              <div className="home-category-copy">
-                <div>
-                  <h3>{category.title}</h3>
-                  <span>{items.length} ürün</span>
+          ({ category, products: items }) => {
+            const cover =
+              items.find((item) => item.builderParts?.enabled) ?? items[0];
+            return (
+              <Link
+                className="home-category-card"
+                href={categoryHref(category.id)}
+                key={category.id}
+              >
+                <div className="home-category-image">
+                  <Image
+                    src={cover.image}
+                    alt={category.title}
+                    fill
+                    sizes="(max-width: 680px) 90vw, 33vw"
+                    style={{
+                      objectPosition: cover.images?.[0]
+                        ? `${cover.images[0].x}% ${cover.images[0].y}%`
+                        : undefined,
+                    }}
+                  />
                 </div>
-                <ArrowUpRight size={22} aria-hidden="true" />
-              </div>
-            </Link>
-          ),
+                <div className="home-category-copy">
+                  <div>
+                    <h3>{category.title}</h3>
+                    <span>{items.length} ürün</span>
+                  </div>
+                  <ArrowUpRight size={22} aria-hidden="true" />
+                </div>
+              </Link>
+            );
+          },
         )}
       </div>
     </section>
